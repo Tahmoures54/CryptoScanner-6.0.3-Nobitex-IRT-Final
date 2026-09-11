@@ -43,7 +43,8 @@ EXCHANGE_OHLCV_LIMIT = {
 DEFAULT_SYMBOLS = [
     "BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT",
     "AVAX/USDT", "LINK/USDT", "DOGE/USDT", "ADA/USDT", "DOT/USDT",
-    "LTC/USDT", "NEAR/USDT", "APT/USDT", "ARB/USDT", "ATOM/USDT",
+    "LTC/USDT", "NEAR/USDT", "APT/USDT", "ARB/USDT", "SUI/USDT",
+    "PEPE/USDT", "FIL/USDT", "INJ/USDT", "OP/USDT", "WIF/USDT",
 ]
 
 
@@ -195,23 +196,18 @@ def fetch_ccxt_symbol(exchange, symbol: str, start: datetime, end: datetime) -> 
     return df[(df.index >= pd.Timestamp(start)) & (df.index <= pd.Timestamp(end))]
 
 
-def liquid_symbols(candidates: List[str], min_quote_vol: float) -> List[str]:
-    try:
-        import ccxt
-        exchange = ccxt.kucoin({"enableRateLimit": True, "timeout": 20_000})
-        tickers = exchange.fetch_tickers(candidates)
-    except Exception:
-        return [s for s in candidates if s.split("/")[0] not in STABLES]
-    kept = []
-    for symbol in candidates:
-        base = symbol.split("/")[0]
-        if base in STABLES:
-            continue
-        t = tickers.get(symbol) or {}
-        qv = float(t.get("quoteVolume") or 0.0)
-        if qv >= min_quote_vol or symbol == "BTC/USDT":
-            kept.append(symbol)
-    return kept or [s for s in candidates if s.split("/")[0] not in STABLES]
+def median_daily_notional(df: pd.DataFrame) -> float:
+    if df is None or df.empty:
+        return 0.0
+    notion = df["close"] * df["volume"]
+    daily = notion.resample("1D").sum()
+    if daily.empty:
+        return 0.0
+    return float(daily.median())
+
+
+def candidate_symbols(candidates: List[str]) -> List[str]:
+    return [s for s in candidates if s.split("/")[0] not in STABLES]
 
 
 def summarize(rep: Dict) -> Dict:
@@ -254,7 +250,7 @@ def main() -> int:
     end = datetime.now(timezone.utc).replace(tzinfo=None)
     start = end - timedelta(days=int(args.months * 30.437))
     params = MomentumBreakoutParams()
-    symbols = liquid_symbols(args.symbols, params.min_quote_volume_usd)
+    symbols = candidate_symbols(args.symbols)
     print("Universe:", ", ".join(symbols), flush=True)
     print(f"Range: {start} → {end}  source={args.source}", flush=True)
 
@@ -287,8 +283,13 @@ def main() -> int:
         if frame is None or len(frame) <= 2000:
             print(f"  skip {symbol}: bars={0 if frame is None else len(frame)}", flush=True)
             continue
+        med_vol = median_daily_notional(frame)
+        if symbol != "BTC/USDT" and med_vol < params.min_quote_volume_usd:
+            print(f"  skip {symbol}: median daily notional ${med_vol:,.0f} < $10M", flush=True)
+            continue
         print(
-            f"  bars={len(frame)}  {frame.index.min()} → {frame.index.max()}",
+            f"  bars={len(frame)}  {frame.index.min()} → {frame.index.max()}  "
+            f"median_daily_usd={med_vol:,.0f}",
             flush=True,
         )
         data[symbol] = frame

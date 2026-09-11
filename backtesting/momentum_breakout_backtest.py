@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from trading.momentum_breakout import (
+    HaltState,
     MomentumBreakoutParams,
     Regime,
     Signal,
@@ -19,6 +20,7 @@ from trading.momentum_breakout import (
     breakout_setup,
     classify_regime,
     enrich_5m,
+    entries_blocked,
     impulse_setup,
     light_trend_ok,
     position_size,
@@ -141,7 +143,7 @@ class MomentumBreakoutBacktest:
         peak = equity
         max_dd = 0.0
         last_r: List[float] = []
-        halt_until: Optional[pd.Timestamp] = None
+        halt_state = HaltState()
         day_start_eq = equity
         week_start_eq = equity
         current_day = None
@@ -185,14 +187,11 @@ class MomentumBreakoutBacktest:
 
             rolling = sum_r()
             regime = classify_regime(rolling, p)
-            if regime is Regime.HALT and halt_until is None:
-                halt_until = ts + pd.Timedelta(hours=p.halt_hours)
-            if halt_until is not None and (
-                ts >= halt_until or regime in (Regime.NORMAL, Regime.HOT)
-            ):
-                halt_until = None
-            halted = (halt_until is not None) or (regime is Regime.HALT)
-            settings = regime_settings(Regime.CAUTION if halted else regime, p)
+            halted = entries_blocked(halt_state, regime, ts, p)
+            trade_regime = (
+                Regime.CAUTION if (halted or regime in (Regime.HALT, Regime.CAUTION)) else regime
+            )
+            settings = regime_settings(trade_regime, p)
             can_enter_regime = not halted
 
             # Fill working orders at this bar's open, then manage high/low/close.
@@ -330,13 +329,13 @@ class MomentumBreakoutBacktest:
         return equity
 
     def _mtm(self, open_pos: Dict[str, OpenPosition], ts: pd.Timestamp) -> float:
+        """Unrealized PnL only. Cash `equity` already holds realized PnL and fees."""
         total = 0.0
         for symbol, pos in open_pos.items():
             frame = self.frames.get(symbol)
             if frame is None or ts not in frame.index:
-                total += pos.remaining * pos.entry
                 continue
-            total += pos.remaining * float(frame.loc[ts]["close"])
+            total += pos.remaining * (float(frame.loc[ts]["close"]) - pos.entry)
         return total
 
     def _flatten(self, pos: OpenPosition, price: float, fee: float) -> Tuple[float, float]:
@@ -523,10 +522,15 @@ def optimize_impulse(
     eligible_best = best
     eligible_rep: Dict = {}
     for impulse in grid:
+        print(f"  IS impulse={impulse} ...", flush=True)
         bt = MomentumBreakoutBacktest(data, params, capital=capital)
         rep = bt.run(start=is_start, end=is_end, impulse_pct=impulse)
         pf = float(rep.get("profit_factor") or 0.0)
         trades = int(rep.get("trades") or 0)
+        print(
+            f"    trades={trades} PF={pf:.3f} ret={float(rep.get('return_pct') or 0.0):.2f}%",
+            flush=True,
+        )
         rows.append({
             "impulse_pct": float(impulse),
             "trades": trades,

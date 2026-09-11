@@ -27,6 +27,39 @@ class Regime(str, Enum):
 
 
 @dataclass
+class HaltState:
+    """24h cooling-off after sum(R) < halt_r; then resume caution until recovered."""
+
+    halt_until: Optional[pd.Timestamp] = None
+    relaxed: bool = False
+
+
+def entries_blocked(state: HaltState, regime: Regime, ts: pd.Timestamp, params: "MomentumBreakoutParams") -> bool:
+    """True = no new entries.
+
+    Halt is a cooling-off window, not a permanent lock: after `halt_hours`
+    the bot resumes in caution even if the last-10 R is still below halt_r.
+    A new halt can start only after R has recovered above halt_r.
+    Recovering to normal/hot during the window ends the halt early.
+    """
+    ts = pd.Timestamp(ts)
+    if regime is Regime.HALT:
+        if not state.relaxed:
+            if state.halt_until is None:
+                state.halt_until = ts + pd.Timedelta(hours=params.halt_hours)
+            if ts >= state.halt_until:
+                state.halt_until = None
+                state.relaxed = True
+        return not state.relaxed
+    state.relaxed = False
+    if state.halt_until is not None and (
+        ts >= state.halt_until or regime in (Regime.NORMAL, Regime.HOT)
+    ):
+        state.halt_until = None
+    return state.halt_until is not None and ts < state.halt_until
+
+
+@dataclass
 class MomentumBreakoutParams:
     # Universe
     min_quote_volume_usd: float = 10_000_000.0
@@ -180,6 +213,14 @@ def classify_regime(sum_r: float, params: MomentumBreakoutParams) -> Regime:
 
 
 def regime_settings(regime: Regime, params: MomentumBreakoutParams) -> Dict[str, float]:
+    if regime is Regime.HALT:
+        return {
+            "risk_pct": params.risk_caution,
+            "max_positions": 0.0,
+            "impulse_pct": params.impulse_pct_caution,
+            "volume_mult": params.volume_mult_caution,
+            "leverage": params.leverage_caution,
+        }
     if regime is Regime.HOT:
         return {
             "risk_pct": params.risk_hot,

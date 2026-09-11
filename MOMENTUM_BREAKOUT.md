@@ -75,10 +75,11 @@ notional ≤ leverage × equity
 | > +3R | Hot | 2.5% | 1.5× | 1.25% | 7 |
 | −2R … +3R | Normal | 3.0% | 1.5× | 0.75% | 5 |
 | < −2R | Caution | 4.5% | 2.0× | 0.35% | 2 |
-| < −5R | Halt new entries **24h** | — | — | — | 0 |
+| < −5R | Halt new entries **24h**, then resume **caution** until last-10 R recovers above −5R | 4.5% | 2.0× | 0.35% | 2 |
 
 - Daily realized equity drop **≥ 4%** → no new entries until next UTC day.
 - Weekly drop **≥ 8%** → no new entries until next week.
+- After a −5R halt window expires, trading resumes in caution even if the last 10 trades are still deep red. A new 24h halt starts only after R has recovered above −5R and then fallen through again. Without that, a bad first cluster would lock the bot forever.
 
 ### Costs in backtest
 - Round-trip fee **0.05%** (0.025% per fill).
@@ -98,7 +99,9 @@ for each closed 5m bar t:
     update open positions (stop first, then scale, then time-stop)
     Rsum = sum(last 10 closed R)
     regime = classify(Rsum)
-    if regime == HALT: state.halt_until = t + 24h
+    if regime == HALT and not already_relaxed:
+        state.halt_until = t + 24h
+        if t >= halt_until: resume caution (do not lock forever)
     if halted or daily_dd>=4% or weekly_dd>=8%: skip entries
     else:
         for each USDT symbol without a position:

@@ -3,11 +3,13 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from trading.momentum_breakout import (
+    HaltState,
     MomentumBreakoutParams,
     Regime,
     classify_regime,
     detect_signals,
     enrich_5m,
+    entries_blocked,
     impulse_setup,
     position_size,
     regime_settings,
@@ -47,6 +49,9 @@ def test_classify_regime_thresholds():
     assert hot["risk_pct"] == 1.25
     assert hot["max_positions"] == 7
     assert hot["impulse_pct"] == 2.5
+    halt = regime_settings(Regime.HALT, p)
+    assert halt["max_positions"] == 0
+    assert halt["impulse_pct"] == 4.5
     cold = regime_settings(Regime.CAUTION, p)
     assert cold["risk_pct"] == 0.35
     assert cold["volume_mult"] == 2.0
@@ -125,3 +130,43 @@ def test_backtest_next_bar_fill_and_stop():
     reasons = [f.reason for f in rep.get("fills") or []]
     assert any(r.startswith("entry-") for r in reasons)
     assert "stop" in reasons
+
+
+def test_halt_is_cooling_off_not_permanent():
+    p = MomentumBreakoutParams(halt_hours=24.0)
+    state = HaltState()
+    t0 = pd.Timestamp("2026-01-01 00:00:00")
+    assert entries_blocked(state, Regime.HALT, t0, p) is True
+    assert entries_blocked(state, Regime.HALT, t0 + pd.Timedelta(hours=23), p) is True
+    assert entries_blocked(state, Regime.HALT, t0 + pd.Timedelta(hours=24), p) is False
+    # still below -5R, but the window expired — do not lock forever
+    assert entries_blocked(state, Regime.HALT, t0 + pd.Timedelta(hours=30), p) is False
+    # recovery re-arms a future halt
+    assert entries_blocked(state, Regime.NORMAL, t0 + pd.Timedelta(hours=31), p) is False
+    t1 = t0 + pd.Timedelta(hours=32)
+    assert entries_blocked(state, Regime.HALT, t1, p) is True
+
+
+def test_backtest_takes_repeated_breakouts():
+    rows = []
+    t0 = datetime(2024, 6, 1)
+    price = 100.0
+    for i in range(220):
+        ts = t0 + timedelta(minutes=5 * i)
+        spike = i >= 50 and (i - 50) % 35 == 0
+        vol = 8_000.0 if spike else 1_000.0
+        move = 3.2 if spike else 0.0
+        o = price
+        c = price + move
+        h = max(o, c) * 1.001
+        l = min(o, c) * 0.999
+        rows.append((ts, o, h, l, c, vol))
+        price = c
+    frame = pd.DataFrame(rows, columns=["timestamp", "open", "high", "low", "close", "volume"])
+    frame = frame.set_index("timestamp")
+    params = MomentumBreakoutParams(warmup_days=0)
+    bt = MomentumBreakoutBacktest(
+        {"AAA/USDT": frame, "BTC/USDT": frame.copy()}, params, capital=10_000, btc_symbol="BTC/USDT",
+    )
+    rep = bt.run()
+    assert int(rep["trades"]) >= 3
