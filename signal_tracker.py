@@ -1668,7 +1668,7 @@ class SignalTracker:
 
         signal = str(row.get("Signal") or row.get("signal") or "").strip()
         signal_l = signal.lower()
-        if not any(x in signal_l for x in ("buy", "movement", "pump", "lead")):
+        if not any(x in signal_l for x in ("buy", "movement", "pump", "lead", "trend")):
             self._log_skip("%s skipped: non-entry signal '%s'", symbol, signal)
             return
 
@@ -1835,7 +1835,7 @@ class SignalTracker:
                             sig = str(item.get("Signal", item.get("signal", ""))).lower()
                             score = safe_float(item.get("Score", item.get("score"))) or 0.0
                             boost = (
-                                30.0 if "global lead" in sig
+                                30.0 if "global lead" in sig or "trend buy" in sig
                                 else 25.0 if "strong buy" in sig
                                 else 10.0 if "buy" in sig or "movement" in sig or "pump" in sig
                                 else 0.0

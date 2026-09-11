@@ -136,7 +136,7 @@ class BotConfig:
     max_new_entries_per_cycle: int = 1
 
     # ── Entry confirmation ───────────────────────────────────
-    confirmation_enabled: bool = True
+    confirmation_enabled: bool = False
     confirmation_pct: float = 0.35
     confirmation_max_minutes: int = 8
     invalidation_pct: float = 1.0
@@ -146,7 +146,7 @@ class BotConfig:
     reverse_signal_exit_enabled: bool = True
     use_risk_filter: bool = False
 
-    # ── Global Lead / Local Lag (CMC → Nobitex) ──────────────
+    # ── Real-movement trend follow (CMC intelligence → Nobitex) ──
     strategy: str = "global_lead_local_lag"
     global_signal_source: str = "CoinMarketCap"
     global_pump_threshold_pct: float = 1.2
@@ -157,7 +157,7 @@ class BotConfig:
     max_global_quote_age_sec: float = 300.0
     max_local_fall_pct: float = 0.8
     global_scan_limit: int = 500
-    min_confirm_scans: int = 1
+    min_confirm_scans: int = 2
     min_observed_move_pct: float = 0.7
     max_local_24h_pct: float = 20.0
     min_global_24h_pct: float = -5.0

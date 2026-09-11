@@ -21,17 +21,15 @@ Official Nobitex API documentation: https://apidocs.nobitex.ir/
 
 ## Live data-source policy (v6.1)
 
-The automatic real-trading path is **Observed Global Lead → Nobitex Local Lag → Nobitex execution**.
+The automatic real-trading path is **observed real movement → trend confirm → Nobitex execution**.
 
 - Market universe: Nobitex `/market/stats` filtered to IRT/Rial markets.
-- Global lead: CoinMarketCap listings cache plus fresh `quotes/latest` for overlapping symbols.
+- Trend reading: CoinMarketCap listings cache plus fresh `quotes/latest` for overlapping symbols.
 - Observed movement: actual CMC USD and Nobitex ask stored every `check_interval_seconds` (default 15s).
-- Fair-value conversion: CMC USD price × live Nobitex USDT/IRT Ask (from the same snapshot, no extra round-trip).
-- Entry: only when Nobitex Ask is still below fair value, the stored CMC path is not falling, and local spread/volume/momentum safety filters pass.
+- Entry: when the stored path or CMC 1h is still up for consecutive scans, the last scans are not fading, and local spread/volume safety filters pass. Nobitex already running the move is allowed.
 - Existing positions: monitored from the full live Nobitex market snapshot every cycle.
-- The legacy Real Trading panel auto-signal queue is bypassed while `global_lead_local_lag` is active, preventing duplicate live orders.
+- The legacy Real Trading panel auto-signal queue is bypassed while the real-movement strategy is active, preventing duplicate live orders.
 - Public CoinGecko/CoinMarketCap/Binance scanner data is never routed into the real executor.
-- The main public scanner no longer silently opens paper trades in the background; Paper Trading remains an explicit/manual workflow.
 - If a real BUY succeeds but an exchange-side protective stop cannot be created, the bot attempts an immediate emergency market exit instead of knowingly continuing unprotected.
 
 This separation makes the source of every real trading decision auditable in the log with `[REAL][NOBITEX]` markers.

@@ -218,7 +218,7 @@ class CryptoScannerApp:
                     or getattr(cfg, "quote_currency", "IRT")
                     or "IRT"
                 ).upper()
-                self.real_signal_tracker.pump_threshold_pct = float(getattr(cfg, "pump_threshold_pct", 3.0))
+                self.real_signal_tracker.pump_threshold_pct = 0.0
                 self.real_signal_tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 3.0))
                 self.real_signal_tracker.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 1.5))
                 self.real_signal_tracker.max_open_trades = int(getattr(cfg, "max_open_positions", 3))
@@ -238,7 +238,7 @@ class CryptoScannerApp:
                     )
                 self.real_signal_tracker.auto_trading_enabled = True
                 self.real_signal_tracker.ignore_signal_filters = True
-                self.real_signal_tracker.confirmation_enabled = bool(getattr(cfg, "confirmation_enabled", True))
+                self.real_signal_tracker.confirmation_enabled = bool(getattr(cfg, "confirmation_enabled", False))
                 self.real_signal_tracker.confirmation_pct = float(getattr(cfg, "confirmation_pct", 0.35))
                 self.real_signal_tracker.confirmation_max_minutes = int(getattr(cfg, "confirmation_max_minutes", 8))
                 self.real_signal_tracker.invalidation_pct = float(getattr(cfg, "invalidation_pct", 1.0))
@@ -325,8 +325,8 @@ class CryptoScannerApp:
             min_local_volume_irt=float(getattr(cfg, "min_volume_24h", 500000.0)),
             max_local_fall_pct=float(getattr(cfg, "max_local_fall_pct", 0.8)),
             max_chase_pct=float(getattr(cfg, "max_chase_pct", 1.2)),
-            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 3) or 3),
-            min_confirm_scans=int(getattr(cfg, "min_confirm_scans", 1) or 1),
+            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 6) or 6),
+            min_confirm_scans=int(getattr(cfg, "min_confirm_scans", 2) or 2),
             min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 0.7)),
             max_local_24h_pct=float(getattr(cfg, "max_local_24h_pct", 20.0)),
             min_global_24h_pct=float(getattr(cfg, "min_global_24h_pct", -5.0)),
@@ -339,9 +339,10 @@ class CryptoScannerApp:
             self.global_lead_engine.configure(**kwargs)
         logger.info(
             "[REAL][GLOBAL] Engine filters | pump=%.2f obs=%.2f spread=%.2f "
-            "lookback=%d age=%.0fs vol=$%.0f",
+            "lookback=%d confirm=%d age=%.0fs vol=$%.0f",
             kwargs["global_pump_pct"], kwargs["min_observed_move_pct"],
             kwargs["max_spread_pct"], kwargs["movement_lookback_scans"],
+            kwargs["min_confirm_scans"],
             kwargs["max_global_quote_age_sec"], kwargs["min_global_volume_usd"],
         )
 
@@ -459,7 +460,7 @@ class CryptoScannerApp:
         return True
 
     def _nobitex_auto_scan(self):
-        """Real strategy: GLOBAL LEAD -> NOBITEX LOCAL LAG -> EXECUTE."""
+        """Real strategy: observed CMC/Nobitex movement → trend follow → execute."""
         if not self.real_signal_tracker or not self.trading_bot:
             return
         try:
@@ -567,7 +568,7 @@ class CryptoScannerApp:
                     )
 
             logger.info(
-                "[REAL] Scan complete | Nobitex markets=%d | CMC opportunities=%d | strategy=OBSERVED_GLOBAL_LEAD | interval=%ss",
+                "[REAL] Scan complete | Nobitex markets=%d | CMC opportunities=%d | strategy=REAL_MOVEMENT_TREND | interval=%ss",
                 len(live_rows), len(candidates), self._real_scan_interval_ms() // 1000,
             )
             paper_hits = [row for row in live_rows if self._is_entry_signal(row.get("Signal"))]
@@ -585,14 +586,13 @@ class CryptoScannerApp:
     @staticmethod
     def _is_entry_signal(sig: Any) -> bool:
         text = str(sig or "").strip().lower()
-        return any(token in text for token in ("buy", "movement", "pump", "lead"))
+        return any(token in text for token in ("buy", "movement", "pump", "lead", "trend"))
 
     def _apply_global_lead_hit(self, row: Dict[str, Any], hit: Dict[str, Any]) -> None:
         """Tag a Nobitex row so SignalTracker will actually enter.
 
-        GlobalLeadEngine already filtered the opportunity. Neutral rows are
-        skipped by the tracker, and a '% Pump' label would be re-checked
-        against the local pump threshold (wrong gate for this strategy).
+        The engine already decided the coin is in a real upward move.
+        Neutral rows are skipped by the tracker.
         """
         row.update(hit)
         ask = (
@@ -623,8 +623,8 @@ class CryptoScannerApp:
         if score is not None:
             row["Score"] = score
         if not self._is_entry_signal(row.get("Signal") or row.get("signal")):
-            row["Signal"] = "Global Lead Buy"
-            row["signal"] = "Global Lead Buy"
+            row["Signal"] = "Trend Buy"
+            row["signal"] = "Trend Buy"
 
     def _lookup_nobitex_market(self, symbol: str) -> Optional[Dict[str, Any]]:
         if not self.trading_bot or not symbol:
@@ -1087,7 +1087,7 @@ class CryptoScannerApp:
         current_prices: Dict[str, float] = {}
         df["Signal"] = "Neutral"
 
-        movement_lookback = int(getattr(cfg, "movement_lookback_scans", 3) or 3) if cfg is not None else 3
+        movement_lookback = int(getattr(cfg, "movement_lookback_scans", 6) or 6) if cfg is not None else 6
         movement_lookback = max(1, min(movement_lookback, 60))
         market_condition = self._get_market_condition(g_data) if g_data else "Neutral"
 
@@ -1521,7 +1521,7 @@ class CryptoScannerApp:
             self.real_signal_tracker.auto_trading_enabled = True
         if self.real_auto_enabled:
             self.ensure_real_auto_cycle()
-            logger.info("[REAL] Auto entries ENABLED (observed Global Lead cycle).")
+            logger.info("[REAL] Auto entries ENABLED (real-movement trend cycle).")
         else:
             logger.info("[REAL] Auto entries PAUSED (open positions still monitored).")
 
