@@ -6,6 +6,7 @@ Live trading uses two distinct layers and **stores the actual prices observed on
 
 1. **Global market intelligence — CoinMarketCap**
    - Fresh `quotes/latest` for symbols that exist on Nobitex (listings cache for the universe)
+   - CMC v3 `quote` arrays and v1 `quote.USD` dicts are both accepted
    - Observed USD move across lookback scans (primary)
    - CMC 1h / 24h / volume-change as confirmation
    - Quote freshness

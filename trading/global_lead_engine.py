@@ -20,6 +20,7 @@ import time
 from collections import defaultdict, deque
 from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
 
+from api.api_coinmarketcap import extract_usd_quote, iter_cmc_coins
 from core.utils import safe_float
 
 
@@ -122,20 +123,7 @@ class GlobalLeadEngine:
 
     @staticmethod
     def _cmc_rows(payload: Any) -> List[Dict[str, Any]]:
-        if not isinstance(payload, dict):
-            return []
-        rows = payload.get("data", [])
-        if isinstance(rows, list):
-            return [row for row in rows if isinstance(row, dict)]
-        if isinstance(rows, dict):
-            out: List[Dict[str, Any]] = []
-            for value in rows.values():
-                if isinstance(value, list):
-                    out.extend(item for item in value if isinstance(item, dict))
-                elif isinstance(value, dict):
-                    out.append(value)
-            return out
-        return []
+        return iter_cmc_coins(payload)
 
     def build_global_map(self, payload: Any, now: Optional[float] = None) -> Dict[str, Dict[str, Any]]:
         now = time.time() if now is None else float(now)
@@ -146,9 +134,8 @@ class GlobalLeadEngine:
             symbol = str(coin.get("symbol") or "").upper().strip()
             if not symbol or symbol in STABLES:
                 continue
-            quote = coin.get("quote") or {}
-            usd = quote.get("USD") if isinstance(quote, dict) else None
-            if not isinstance(usd, dict):
+            usd = extract_usd_quote(coin)
+            if not usd:
                 continue
             price = safe_float(usd.get("price")) or 0.0
             if price <= 0:

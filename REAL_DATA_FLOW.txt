@@ -2,7 +2,7 @@ CryptoScanner 6.1.0 — Real Trading Data Flow
 
 REAL AUTO TRADING — OBSERVED GLOBAL LEAD / NOBITEX LOCAL LAG
 1. Nobitex /market/stats (IRT/Rial markets) -> live local market universe and order-book liquidity.
-2. CoinMarketCap listings (cached) + quotes/latest for overlapping symbols -> actual USD prices this cycle.
+2. CoinMarketCap listings (cached; v1 quote.USD dict or v3 quote[] array) + quotes/latest for overlapping symbols -> actual USD prices this cycle.
 3. Engine stores CMC USD and Nobitex ask every scan and measures real lookback movement.
 4. Live Nobitex USDT/IRT ask (from the same market snapshot) -> USD-to-IRT fair-value conversion.
 5. GlobalLeadEngine keeps a candidate only when:

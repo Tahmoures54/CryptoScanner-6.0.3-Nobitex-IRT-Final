@@ -15,6 +15,8 @@ from typing import Any, Dict, List
 
 import pandas as pd
 
+from api.api_coinmarketcap import extract_usd_quote, iter_cmc_coins
+
 logger = logging.getLogger(__name__)
 
 # تلاش برای خواندن کلید از متغیر محیطی؛ در غیر این صورت از کلید پیش‌فرض استفاده می‌شود
@@ -42,15 +44,13 @@ def _get_cmc_market_data(limit: int = 500) -> List[Dict[str, Any]]:
     try:
         resp = requests.get(CMC_LISTING_URL, headers=headers, params=params, timeout=15)
         resp.raise_for_status()
-        data = resp.json().get("data", [])
-        
         coins = []
-        for c in data:
-            sym = c.get("symbol", "").strip().upper()
+        for c in iter_cmc_coins(resp.json()):
+            sym = str(c.get("symbol") or "").strip().upper()
             if not sym or sym in BLACKLIST:
                 continue
-            
-            quote = c.get("quote", {}).get("USD", {})
+
+            quote = extract_usd_quote(c)
             price = quote.get("price", 0.0)
             change_1h = quote.get("percent_change_1h", 0.0) or 0.0
             change_24h = quote.get("percent_change_24h", 0.0) or 0.0

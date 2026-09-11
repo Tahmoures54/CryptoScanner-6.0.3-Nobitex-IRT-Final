@@ -42,7 +42,13 @@ from core.utils import (
 )
 
 from api.api_coingecko import CoinGeckoClient
-from api.api_coinmarketcap import CoinMarketCapClient
+from api.api_coinmarketcap import (
+    CoinMarketCapClient,
+    cmc_symbol_id_map,
+    describe_quote_shape,
+    extract_usd_quote,
+    iter_cmc_coins,
+)
 from api.api_tronscan import TronscanClient
 
 from gui.ui_theme import ModernTheme
@@ -301,21 +307,27 @@ class CryptoScannerApp:
         )
         if not isinstance(payload, dict):
             return self._cmc_listings_cache
+        coins = iter_cmc_coins(payload)
+        if not coins:
+            logger.warning(
+                "[REAL][GLOBAL] CMC listings payload had no coin rows (data=%s)",
+                type(payload.get("data")).__name__,
+            )
+            return self._cmc_listings_cache
+        try:
+            id_map = cmc_symbol_id_map(payload)
+        except Exception as exc:
+            logger.warning("[REAL][GLOBAL] CMC listings id-map failed: %s", exc)
+            return self._cmc_listings_cache
         self._cmc_listings_cache = payload
         self._cmc_listings_ts = now
-        id_map: Dict[str, Any] = {}
-        for coin in payload.get("data") or []:
-            if not isinstance(coin, dict):
-                continue
-            symbol = str(coin.get("symbol") or "").upper().strip()
-            cid = coin.get("id")
-            if not symbol or cid is None:
-                continue
-            prev = id_map.get(symbol)
-            cap = safe_float((coin.get("quote") or {}).get("USD", {}).get("market_cap")) or 0.0
-            if prev is None or cap >= float(prev.get("cap") or 0.0):
-                id_map[symbol] = {"id": cid, "cap": cap}
-        self._cmc_id_by_symbol = {k: v["id"] for k, v in id_map.items()}
+        self._cmc_id_by_symbol = id_map
+        logger.info(
+            "[REAL][GLOBAL] CMC listings cached | coins=%d | mapped_ids=%d | quote=%s",
+            len(coins),
+            len(id_map),
+            describe_quote_shape(coins[0]),
+        )
         return payload
 
     def _fetch_cmc_global_payload(self, local_symbols: List[str]) -> Optional[Dict[str, Any]]:
@@ -457,7 +469,11 @@ class CryptoScannerApp:
                                 if self._has_executable_depth(hit, min_depth)
                             ]
                 except Exception as exc:
-                    logger.warning("[REAL][GLOBAL] Global lead data unavailable: %s", exc)
+                    logger.warning(
+                        "[REAL][GLOBAL] Global lead data unavailable: %s",
+                        exc,
+                        exc_info=True,
+                    )
 
             candidate_map = {str(x.get("Symbol", "")).upper(): x for x in candidates}
             for row in live_rows:
@@ -901,19 +917,8 @@ class CryptoScannerApp:
     def _parse_listings(self, api: str, data: Any) -> pd.DataFrame:
         rows = []
         if api == "CoinMarketCap":
-            coins = data.get("data", [])
-            for r, c in enumerate(coins, 1):
-                raw_quote = c.get("quote") or {}
-                if isinstance(raw_quote, dict):
-                    q = raw_quote.get("USD")
-                elif isinstance(raw_quote, list):
-                    q = next(
-                        (item for item in raw_quote
-                         if str(item.get("symbol", "")).upper() == "USD"),
-                        None,
-                    )
-                else:
-                    q = None
+            for r, c in enumerate(iter_cmc_coins(data), 1):
+                q = extract_usd_quote(c)
                 if not q:
                     continue
                 rows.append({
@@ -1118,14 +1123,13 @@ class CryptoScannerApp:
             return "Neutral"
         try:
             if self.api_source_var.get() == "CoinMarketCap":
-                change = (
-                    g_data.get("data", {}).get("quote", {})
-                    .get("USD", {}).get("market_cap_change_24h", 0)
-                )
+                usd = extract_usd_quote(g_data.get("data") if isinstance(g_data, dict) else g_data)
+                change = usd.get("market_cap_change_24h") or usd.get("percent_change_24h") or 0
             else:
-                change = g_data.get("data", {}).get(
-                    "market_cap_change_percentage_24h_usd", 0,
-                )
+                data = g_data.get("data") if isinstance(g_data, dict) else {}
+                if not isinstance(data, dict):
+                    data = {}
+                change = data.get("market_cap_change_percentage_24h_usd", 0)
             change = float(change or 0)
             if change > 2.0:
                 return "Strong Bull"

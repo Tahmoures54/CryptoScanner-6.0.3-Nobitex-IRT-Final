@@ -8,6 +8,155 @@ from core.config import API_KEYS
 
 Identifier = Optional[Union[str, int, Iterable[Union[str, int]]]]
 
+_USD_ALIASES = {"USD", "US DOLLAR", "UNITED STATES DOLLAR"}
+_QUOTE_KEY_ALIASES = {
+    "percentChange1h": "percent_change_1h",
+    "percentChange24h": "percent_change_24h",
+    "percentChange7d": "percent_change_7d",
+    "percentChange30d": "percent_change_30d",
+    "volume24h": "volume_24h",
+    "volumeChange24h": "volume_change_24h",
+    "marketCap": "market_cap",
+    "fullyDilutedMarketCap": "fully_diluted_market_cap",
+    "lastUpdated": "last_updated",
+}
+_QUOTE_VALUE_KEYS = {
+    "price",
+    "market_cap",
+    "marketCap",
+    "percent_change_1h",
+    "percentChange1h",
+    "volume_24h",
+    "volume24h",
+}
+
+
+def _as_float(value: Any) -> float:
+    try:
+        if value is None or value == "":
+            return 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _looks_like_quote(item: Dict[str, Any]) -> bool:
+    return any(key in item for key in _QUOTE_VALUE_KEYS)
+
+
+def _is_usd_quote(item: Dict[str, Any]) -> bool:
+    for key in ("symbol", "convert", "name", "code"):
+        text = str(item.get(key) or "").upper().strip()
+        if text in _USD_ALIASES:
+            return True
+    ident = item.get("id")
+    if ident is not None and str(ident).upper().strip() in _USD_ALIASES:
+        return True
+    return False
+
+
+def _normalize_usd_quote(usd: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(usd)
+    for src, dst in _QUOTE_KEY_ALIASES.items():
+        if out.get(dst) is None and src in usd and usd[src] is not None:
+            out[dst] = usd[src]
+    return out
+
+
+def _usd_from_quote_container(raw: Any) -> Dict[str, Any]:
+    """Return the USD quote object from v1 dict or v3 list containers."""
+    if isinstance(raw, dict):
+        nested = raw.get("USD")
+        if isinstance(nested, dict):
+            return nested
+        if isinstance(nested, list):
+            return _usd_from_quote_container(nested)
+        for key, value in raw.items():
+            if str(key).upper() == "USD" and isinstance(value, dict):
+                return value
+        if "USD" not in raw and _looks_like_quote(raw):
+            return raw
+        return {}
+    if isinstance(raw, list):
+        dicts = [item for item in raw if isinstance(item, dict)]
+        for item in dicts:
+            if _is_usd_quote(item):
+                return item
+        for item in dicts:
+            if _looks_like_quote(item):
+                return item
+        return {}
+    return {}
+
+
+def extract_usd_quote(coin: Any) -> Dict[str, Any]:
+    """Pull a normalized USD quote from a CMC asset (v1 dict or v3 list).
+
+    CoinMarketCap v3 listings/quotes return ``quote`` as an array of
+    ``{"symbol": "USD", ...}`` objects. v1 returns ``quote: {"USD": {...}}``.
+    Calling ``.get`` on the v3 array raises ``AttributeError``.
+    """
+    if not isinstance(coin, dict):
+        return {}
+    raw = coin.get("quote")
+    if raw is None:
+        raw = coin.get("quotes")
+    usd = _usd_from_quote_container(raw)
+    if not usd:
+        return {}
+    return _normalize_usd_quote(usd)
+
+
+def iter_cmc_coins(payload: Any) -> List[Dict[str, Any]]:
+    """Yield coin dicts from listings or quotes payloads."""
+    if isinstance(payload, list):
+        return [row for row in payload if isinstance(row, dict)]
+    if not isinstance(payload, dict):
+        return []
+    data = payload.get("data")
+    if isinstance(data, list):
+        return [row for row in data if isinstance(row, dict)]
+    if isinstance(data, dict):
+        out: List[Dict[str, Any]] = []
+        for value in data.values():
+            if isinstance(value, list):
+                out.extend(item for item in value if isinstance(item, dict))
+            elif isinstance(value, dict):
+                out.append(value)
+        return out
+    return []
+
+
+def cmc_symbol_id_map(payload: Any) -> Dict[str, Any]:
+    """Map ticker → CMC id, preferring the higher USD market cap on duplicates."""
+    ranked: Dict[str, Dict[str, Any]] = {}
+    for coin in iter_cmc_coins(payload):
+        symbol = str(coin.get("symbol") or "").upper().strip()
+        cid = coin.get("id")
+        if not symbol or cid is None:
+            continue
+        cap = _as_float(extract_usd_quote(coin).get("market_cap"))
+        prev = ranked.get(symbol)
+        if prev is None or cap >= _as_float(prev.get("cap")):
+            ranked[symbol] = {"id": cid, "cap": cap}
+    return {symbol: row["id"] for symbol, row in ranked.items()}
+
+
+def describe_quote_shape(coin: Any) -> str:
+    if not isinstance(coin, dict):
+        return type(coin).__name__
+    raw = coin.get("quote")
+    if raw is None:
+        raw = coin.get("quotes")
+    if isinstance(raw, list):
+        first = next((item for item in raw if isinstance(item, dict)), {})
+        label = first.get("symbol") or first.get("convert") or "item"
+        return f"list[{len(raw)}] {label}"
+    if isinstance(raw, dict):
+        keys = ",".join(str(key) for key in list(raw.keys())[:4])
+        return f"dict[{keys}]"
+    return type(raw).__name__
+
 
 class CoinMarketCapClient(ApiBaseClient):
     """
