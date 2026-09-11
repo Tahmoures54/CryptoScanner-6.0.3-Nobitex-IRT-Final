@@ -7,8 +7,6 @@ from tkinter import ttk
 from typing import Any, Dict, Optional
 
 from gui.ui_theme import Theme, Styles
-from gui.panels.paper_trading_panel import PaperTradingPanel
-from gui.panels.real_trading_panel import RealTradingPanel
 
 logger = logging.getLogger(__name__)
 T = Theme
@@ -77,6 +75,7 @@ class UnifiedTradingWindow(tk.Toplevel):
         # Paper Trading tab
         paper_title = "📊 Paper Trading" if self.use_emojis else "Paper Trading"
         try:
+            from gui.panels.paper_trading_panel import PaperTradingPanel
             paper_frame = PaperTradingPanel(self._nb, self.main_app)
             self._nb.add(paper_frame, text=paper_title)
             self._panels[self.TAB_PAPER] = paper_frame
@@ -86,6 +85,7 @@ class UnifiedTradingWindow(tk.Toplevel):
         # Real Trading tab
         real_title = "🚀 Real Trading" if self.use_emojis else "Real Trading"
         try:
+            from gui.panels.real_trading_panel import RealTradingPanel
             real_frame = RealTradingPanel(self._nb, self.main_app)
             self._nb.add(real_frame, text=real_title)
             self._panels[self.TAB_REAL] = real_frame
