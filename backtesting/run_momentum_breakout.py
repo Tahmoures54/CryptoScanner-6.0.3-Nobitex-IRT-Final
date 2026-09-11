@@ -328,6 +328,11 @@ def main() -> int:
         "full_sample": summarize(full_rep),
         "reject_oos_if_pf_below": 1.2,
         "oos_rejected": oos_pf < 1.2,
+        "verdict": (
+            f"REJECT — OOS profit factor {oos_pf:.3f} < 1.2"
+            if oos_pf < 1.2
+            else f"PASS — OOS profit factor {oos_pf:.3f} >= 1.2"
+        ),
         "symbols": list(data),
         "start": str(span[0]),
         "end": str(span[-1]),
@@ -341,6 +346,7 @@ def main() -> int:
             "Signals on closed 5m bars; fills at next open + 0.10% slip.",
             "OOS is the last 1/3 of the sample after a one-shot impulse grid on the first 2/3.",
             "This module is USDT research, not the Nobitex IRT live path.",
+            "Impulse grid {2.5, 3.0, 3.5} did not change the trade set: almost all fills are 20-bar volume breakouts, not 3% 5m impulses (those are rare on $10M+ names).",
         ],
     }
     REPORT.mkdir(parents=True, exist_ok=True)

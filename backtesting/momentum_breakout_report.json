@@ -1,0 +1,138 @@
+{
+  "generated_at": "2026-09-11T17:24:29.717459+00:00",
+  "data_source": "binance_vision",
+  "impulse_pct_is": 2.5,
+  "is_grid": [
+    {
+      "impulse_pct": 2.5,
+      "trades": 871,
+      "profit_factor": 0.03248325770595584,
+      "return_pct": -92.65148050708173,
+      "avg_r": -1.1382584655033807
+    },
+    {
+      "impulse_pct": 3.0,
+      "trades": 871,
+      "profit_factor": 0.03248325770595584,
+      "return_pct": -92.65148050708173,
+      "avg_r": -1.1382584655033807
+    },
+    {
+      "impulse_pct": 3.5,
+      "trades": 871,
+      "profit_factor": 0.03248325770595584,
+      "return_pct": -92.65148050708173,
+      "avg_r": -1.1382584655033807
+    }
+  ],
+  "in_sample": {
+    "trades": 871,
+    "win_rate": 6.66,
+    "profit_factor": 0.032,
+    "avg_r": -1.138,
+    "max_drawdown_pct": 92.67,
+    "sharpe": -12.963,
+    "return_pct": -92.65,
+    "trades_per_month": 125.05,
+    "hold_return_pct": -27.99,
+    "accepted": false,
+    "by_regime": {
+      "bull": {
+        "trades": 471,
+        "win_rate": 8.07,
+        "profit_factor": 0.046,
+        "avg_r": -1.121
+      },
+      "bear": {
+        "trades": 400,
+        "win_rate": 5.0,
+        "profit_factor": 0.022,
+        "avg_r": -1.159
+      }
+    }
+  },
+  "out_of_sample": {
+    "trades": 506,
+    "win_rate": 4.15,
+    "profit_factor": 0.027,
+    "avg_r": -1.294,
+    "max_drawdown_pct": 78.45,
+    "sharpe": -12.73,
+    "return_pct": -78.4,
+    "trades_per_month": 127.28,
+    "hold_return_pct": -5.17,
+    "accepted": false,
+    "by_regime": {
+      "bull": {
+        "trades": 253,
+        "win_rate": 2.77,
+        "profit_factor": 0.009,
+        "avg_r": -1.314
+      },
+      "bear": {
+        "trades": 253,
+        "win_rate": 5.53,
+        "profit_factor": 0.039,
+        "avg_r": -1.274
+      }
+    }
+  },
+  "full_sample": {
+    "trades": 1361,
+    "win_rate": 5.8,
+    "profit_factor": 0.032,
+    "avg_r": -1.191,
+    "max_drawdown_pct": 98.31,
+    "sharpe": -12.748,
+    "return_pct": -98.3,
+    "trades_per_month": 124.03,
+    "hold_return_pct": -31.71,
+    "accepted": false,
+    "by_regime": {
+      "bull": {
+        "trades": 729,
+        "win_rate": 6.31,
+        "profit_factor": 0.045,
+        "avg_r": -1.185
+      },
+      "bear": {
+        "trades": 632,
+        "win_rate": 5.22,
+        "profit_factor": 0.023,
+        "avg_r": -1.198
+      }
+    }
+  },
+  "reject_oos_if_pf_below": 1.2,
+  "oos_rejected": true,
+  "verdict": "REJECT — OOS profit factor 0.027 < 1.2",
+  "symbols": [
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "XRP/USDT",
+    "AVAX/USDT",
+    "LINK/USDT",
+    "DOGE/USDT",
+    "ADA/USDT",
+    "LTC/USDT",
+    "NEAR/USDT",
+    "SUI/USDT",
+    "PEPE/USDT"
+  ],
+  "start": "2025-09-11 17:25:00",
+  "end": "2026-09-10 23:55:00",
+  "split": "2026-05-12 13:45:00",
+  "costs": {
+    "fee_round_trip_pct": 0.05,
+    "slippage_pct": 0.1
+  },
+  "notes": [
+    "Spread <0.10% cannot be measured from OHLCV; universe is liquid Binance USDT majors.",
+    "Signals on closed 5m bars; fills at next open + 0.10% slip.",
+    "OOS is the last 1/3 of the sample after a one-shot impulse grid on the first 2/3.",
+    "This module is USDT research, not the Nobitex IRT live path.",
+    "Impulse grid {2.5, 3.0, 3.5} did not change the trade set: almost all fills are 20-bar volume breakouts, not 3% 5m impulses (those are rare on $10M+ names)."
+  ]
+}
