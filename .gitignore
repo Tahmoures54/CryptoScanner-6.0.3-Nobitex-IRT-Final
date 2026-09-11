@@ -79,5 +79,6 @@ coverage.xml
 # Generated exports
 exports/
 reports/
+data/ohlcv_cache/
 *.xlsx
 *.csv
