@@ -1,4 +1,4 @@
-﻿# gui/panels/paper_trading_panel.py
+# gui/panels/paper_trading_panel.py
 from __future__ import annotations
 
 import csv

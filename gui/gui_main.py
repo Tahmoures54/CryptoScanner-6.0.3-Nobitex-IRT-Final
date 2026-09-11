@@ -48,7 +48,6 @@ from api.api_tronscan import TronscanClient
 from gui.ui_theme import ModernTheme
 from gui.ui_factory import UIFactory
 from gui.gui_helpers import center_window
-from gui.unified_trading_window import UnifiedTradingWindow
 
 from gui.dialogs.note_window import NoteWindow
 from gui.dialogs.settings_window import SettingsWindow
@@ -1543,12 +1542,14 @@ class CryptoScannerApp:
 
     def open_bot_panel(self):
         if self._has_bot_access():
+            from gui.unified_trading_window import UnifiedTradingWindow
             UnifiedTradingWindow(self.root, self, initial_tab=1)
         else:
             self._show_bot_locked()
 
     def open_signal_performance(self):
         try:
+            from gui.unified_trading_window import UnifiedTradingWindow
             UnifiedTradingWindow(self.root, self, initial_tab=0)
         except Exception as e:
             logger.error("Error opening unified trading window: %s", e)
