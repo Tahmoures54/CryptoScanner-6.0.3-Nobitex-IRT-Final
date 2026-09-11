@@ -7,9 +7,9 @@ REAL AUTO TRADING — OBSERVED GLOBAL LEAD / NOBITEX LOCAL LAG
 4. Live Nobitex USDT/IRT ask (from the same market snapshot) -> USD-to-IRT fair-value conversion.
 5. GlobalLeadEngine keeps a candidate only when:
    - CMC path we stored is still leading (or a live observed pump is underway)
-   - Nobitex Ask is still below fair IRT value
+   - Nobitex Ask is still below fair IRT, or only a small premium while local price lagged the CMC move
    - spread / volume / freshness / BTC-regime / local-lag filters pass
-6. Confirmed candidates go to the dedicated real SignalTracker.
+6. Confirmed candidates go to the dedicated real SignalTracker and are shadowed on Paper Trading (simulated, no Nobitex order).
 7. Real SignalTracker -> TradingBot -> Nobitex order API.
 8. Actual fill confirmation -> native exchange-side stop_market -> trailing replacement -> exit.
 
@@ -23,7 +23,8 @@ IMPORTANT
 PAPER / PUBLIC SCANNER
 - CoinGecko / CoinMarketCap / Binance/public scanner data remains informational for the main scanner.
 - It is not routed to the real executor.
-- Main-screen background paper auto-trading is disabled; Paper Trading is explicit/manual.
+- Main-screen background paper auto-trading of public % Pump signals stays off.
+- Paper Trading shadows Global Lead candidates with simulated fills.
 
 LOGGING
 - [REAL][GLOBAL→NOBITEX] = global intelligence + local execution candidate

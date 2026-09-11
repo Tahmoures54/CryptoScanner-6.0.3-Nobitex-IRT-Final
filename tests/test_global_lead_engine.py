@@ -128,6 +128,39 @@ def test_btc_dump_blocks_alt_entries():
     assert out == []
 
 
+def test_observed_move_can_qualify_below_1h_threshold():
+    e = GlobalLeadEngine(
+        global_pump_pct=3, min_discount_pct=1.5,
+        min_observed_move_pct=0.6, movement_lookback_scans=2,
+    )
+    e.evaluate(local(), cmc(price=10.0, change=1.0), 100_000, now=1000)
+    e.evaluate(local(), cmc(price=10.05, change=1.0), 100_000, now=1015)
+    out = e.evaluate(local(), cmc(price=10.12, change=1.0), 100_000, now=1030)
+    assert len(out) == 1
+    assert out[0]["ObservedGlobalMove (%)"] > 0.6
+
+
+def test_velocity_lag_allows_small_premium_below_min_discount():
+    e = GlobalLeadEngine(
+        global_pump_pct=3, min_discount_pct=1.5, min_observed_move_pct=0.6,
+        movement_lookback_scans=2, max_local_premium_pct=1.5,
+    )
+    loc = local(ask=1_020_000, bid=1_018_000, last=1_019_000)
+    e.evaluate(loc, cmc(price=10.0, change=1.0), 100_000, now=1000)
+    e.evaluate(loc, cmc(price=10.08, change=1.0), 100_000, now=1015)
+    out = e.evaluate(loc, cmc(price=10.16, change=1.0), 100_000, now=1030)
+    assert len(out) == 1
+    assert out[0]["Nobitex Discount (%)"] < 1.5
+
+
+def test_filter_stats_explain_zero_candidates():
+    e = GlobalLeadEngine(global_pump_pct=3, min_discount_pct=1.5)
+    e.evaluate(local(), {"data": []}, 100_000, now=1000)
+    assert e.last_stats["no_cmc"] >= 1
+    assert e.last_stats["passed"] == 0
+    assert "no_cmc=" in e.stats_line()
+
+
 def test_bot_config_keeps_global_lead_fields(tmp_path):
     cfg = BotConfig.from_dict({
         "global_pump_threshold_pct": 2.5,
@@ -135,15 +168,18 @@ def test_bot_config_keeps_global_lead_fields(tmp_path):
         "strategy": "global_lead_local_lag",
         "check_interval_seconds": 15,
         "take_profit_pct": 4.0,
+        "max_local_premium_pct": 1.5,
     })
     assert cfg.global_pump_threshold_pct == 2.5
     assert cfg.min_nobitex_discount_pct == 1.2
     assert cfg.strategy == "global_lead_local_lag"
     assert cfg.check_interval_seconds == 15
     assert cfg.take_profit_percent == 4.0
+    assert cfg.max_local_premium_pct == 1.5
     path = str(tmp_path / "bot.json")
     assert save_config(cfg, path)
     loaded = load_config(path)
     assert loaded.global_pump_threshold_pct == 2.5
     assert loaded.strategy == "global_lead_local_lag"
     assert loaded.take_profit_percent == 4.0
+    assert loaded.max_local_premium_pct == 1.5

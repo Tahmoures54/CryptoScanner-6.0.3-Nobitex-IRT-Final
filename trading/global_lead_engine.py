@@ -65,6 +65,7 @@ class GlobalLeadEngine:
         min_global_24h_pct: float = -100.0,
         min_volume_change_24h_pct: float = -100.0,
         btc_max_dump_pct: float = 0.0,
+        max_local_premium_pct: float = 1.5,
         history_len: int = 48,
     ):
         self.global_pump_pct = float(global_pump_pct)
@@ -83,7 +84,9 @@ class GlobalLeadEngine:
         self.min_global_24h_pct = float(min_global_24h_pct)
         self.min_volume_change_24h_pct = float(min_volume_change_24h_pct)
         self.btc_max_dump_pct = float(btc_max_dump_pct)
+        self.max_local_premium_pct = float(max_local_premium_pct or 0.0)
         self.history_len = max(8, int(history_len or 48))
+        self.last_stats: Dict[str, Any] = {}
 
         self._usd_history: Dict[str, Deque[Tuple[float, float]]] = defaultdict(self._new_history)
         self._irt_history: Dict[str, Deque[Tuple[float, float]]] = defaultdict(self._new_history)
@@ -107,6 +110,29 @@ class GlobalLeadEngine:
         if self.history_len != getattr(self._usd_history, "maxlen", None):
             self._usd_history.default_factory = self._new_history
             self._irt_history.default_factory = self._new_history
+
+    def observed_lead_threshold(self) -> float:
+        """Live observed move needed across lookback scans.
+
+        This is intentionally below the CMC 1h pump gate. Requiring the full
+        1h threshold over 4–6 scans made the observed path almost unreachable.
+        """
+        if self.min_observed_move_pct > 0:
+            return max(0.6, float(self.min_observed_move_pct))
+        return max(0.75, float(self.global_pump_pct) * 0.35)
+
+    def stats_line(self) -> str:
+        s = self.last_stats or {}
+        return (
+            "local={local} cmc={matched} no_cmc={no_cmc} spread={spread} "
+            "vol={volume} stale={stale} no_lead={no_lead} premium={premium} "
+            "passed={passed} btc_dump={btc_dump} median_disc={median_discount} "
+            "best_1h={best_1h} usdt_irt={usdt_irt}"
+        ).format(**{k: s.get(k, 0) for k in (
+            "local", "matched", "no_cmc", "spread", "volume", "stale",
+            "no_lead", "premium", "passed", "btc_dump", "median_discount",
+            "best_1h", "usdt_irt",
+        )})
 
     @staticmethod
     def usdt_irt_from_rows(local_rows: Iterable[Dict[str, Any]]) -> float:
@@ -247,19 +273,34 @@ class GlobalLeadEngine:
         now: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         now = time.time() if now is None else float(now)
+        stats: Dict[str, Any] = {
+            "local": 0, "matched": 0, "no_cmc": 0, "no_ask": 0, "volume": 0,
+            "spread": 0, "stale": 0, "no_lead": 0, "falling": 0, "premium": 0,
+            "too_cheap": 0, "local_fall": 0, "local_ahead": 0, "chase": 0,
+            "btc_dump": 0, "local_24h": 0, "global_24h": 0, "vol_chg": 0,
+            "confirm": 0, "passed": 0, "btc_dumping": False,
+            "median_discount": 0.0, "best_1h": 0.0, "usdt_irt": 0.0,
+        }
         fx = float(usdt_irt or 0.0)
+        stats["usdt_irt"] = round(fx, 2)
         if fx <= 0:
+            self.last_stats = stats
             return []
         global_map = self.build_global_map(global_payload, now=now)
         lookback = self.movement_lookback_scans
+        obs_need = self.observed_lead_threshold()
         btc_dumping = self._btc_is_dumping(global_map, now)
+        stats["btc_dumping"] = btc_dumping
         live_symbols = []
         candidates: List[Dict[str, Any]] = []
+        discounts: List[float] = []
+        best_1h = 0.0
 
         for local in local_rows or []:
             symbol = str(local.get("Symbol") or "").upper().strip()
             if not symbol or symbol in STABLES:
                 continue
+            stats["local"] += 1
             live_symbols.append(symbol)
             g = global_map.get(symbol)
             ask = safe_float(local.get("Ask")) or 0.0
@@ -271,56 +312,59 @@ class GlobalLeadEngine:
             if g:
                 self._record(symbol, usd, ask or last, now)
             else:
+                stats["no_cmc"] += 1
                 if ask > 0 or last > 0:
                     self._record(symbol, 0.0, ask or last, now)
                 continue
 
+            stats["matched"] += 1
+            best_1h = max(best_1h, float(g["Global1hPct"] or 0.0))
+
             if ask <= 0:
+                stats["no_ask"] += 1
                 continue
             bid = safe_float(local.get("Bid")) or 0.0
             volume_irt = safe_float(local.get("Volume")) or 0.0
             if bid <= 0 or volume_irt < self.min_local_volume_irt:
+                stats["volume"] += 1
                 continue
             spread = (ask - bid) / bid * 100.0 if ask >= bid else 99.0
             if spread > self.max_spread_pct:
+                stats["spread"] += 1
                 continue
             if g["GlobalVolumeUSD"] < self.min_global_volume_usd:
+                stats["volume"] += 1
                 continue
             if g["GlobalUpdatedAgeSec"] > self.max_global_quote_age_sec:
+                stats["stale"] += 1
                 continue
             if g["Global24hPct"] < self.min_global_24h_pct:
+                stats["global_24h"] += 1
                 continue
             if g["GlobalVolumeChange24hPct"] < self.min_volume_change_24h_pct:
+                stats["vol_chg"] += 1
                 continue
 
             local_24h = safe_float(local.get("24h Change (%)")) or 0.0
             if self.max_local_24h_pct > 0 and local_24h > self.max_local_24h_pct:
+                stats["local_24h"] += 1
                 continue
 
             if btc_dumping and symbol not in _BTC_PROXIES:
+                stats["btc_dump"] += 1
                 continue
 
             cmc_lead = g["Global1hPct"] >= self.global_pump_pct
-            strong_observed = (
-                observed_global is not None
-                and observed_global >= max(self.global_pump_pct, self.min_observed_move_pct)
-            )
+            strong_observed = observed_global is not None and observed_global >= obs_need
             if not (cmc_lead or strong_observed):
+                stats["no_lead"] += 1
                 self._gap_hits.pop(symbol, None)
                 self._gap_first_seen.pop(symbol, None)
                 continue
 
             # Trust prices we actually stored: a falling CMC path invalidates a green 1h print.
             if observed_global is not None and observed_global < -0.15:
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
-                continue
-            if (
-                self.min_observed_move_pct > 0
-                and observed_global is not None
-                and observed_global < self.min_observed_move_pct
-                and not cmc_lead
-            ):
+                stats["falling"] += 1
                 self._gap_hits.pop(symbol, None)
                 self._gap_first_seen.pop(symbol, None)
                 continue
@@ -329,13 +373,33 @@ class GlobalLeadEngine:
             if fair_irt <= 0:
                 continue
             discount = (fair_irt - ask) / fair_irt * 100.0
-            if discount < self.min_discount_pct or discount > self.max_discount_pct:
+            discounts.append(discount)
+            velocity_lag = (
+                observed_global is not None
+                and observed_local is not None
+                and observed_global >= obs_need
+                and observed_local < observed_global - 0.15
+            )
+            price_discount_ok = discount >= self.min_discount_pct
+            premium_lag_ok = (
+                self.max_local_premium_pct > 0
+                and discount >= -abs(self.max_local_premium_pct)
+                and velocity_lag
+            )
+            if discount > self.max_discount_pct:
+                stats["too_cheap"] += 1
+                self._gap_hits.pop(symbol, None)
+                self._gap_first_seen.pop(symbol, None)
+                continue
+            if not (price_discount_ok or premium_lag_ok):
+                stats["premium"] += 1
                 self._gap_hits.pop(symbol, None)
                 self._gap_first_seen.pop(symbol, None)
                 continue
 
             local_tick = safe_float(local.get("Nobitex 30s Change (%)")) or 0.0
             if local_tick < -self.max_local_fall_pct:
+                stats["local_fall"] += 1
                 self._gap_hits.pop(symbol, None)
                 self._gap_first_seen.pop(symbol, None)
                 continue
@@ -346,12 +410,14 @@ class GlobalLeadEngine:
                 and observed_local is not None
                 and observed_local > observed_global + 0.35
             ):
+                stats["local_ahead"] += 1
                 self._gap_hits.pop(symbol, None)
                 self._gap_first_seen.pop(symbol, None)
                 continue
 
             chase_pct = self._chase_pct(ask, last)
             if chase_pct > self.max_chase_pct:
+                stats["chase"] += 1
                 continue
 
             hits = self._gap_hits.get(symbol, 0) + 1
@@ -362,6 +428,7 @@ class GlobalLeadEngine:
                 first = now
             self._last_gap[symbol] = discount
             if hits < self.min_confirm_scans:
+                stats["confirm"] += 1
                 continue
 
             lag_seconds = max(0.0, now - first)
@@ -376,6 +443,7 @@ class GlobalLeadEngine:
                 local_tick=local_tick,
                 lag_seconds=lag_seconds,
             )
+            stats["passed"] += 1
             candidates.append({
                 **local,
                 **g,
@@ -403,4 +471,10 @@ class GlobalLeadEngine:
 
         self._prune_gaps(live_symbols)
         candidates.sort(key=lambda x: float(x.get("GlobalLeadScore", 0.0)), reverse=True)
+        discounts.sort()
+        stats["best_1h"] = round(best_1h, 2)
+        if discounts:
+            mid = discounts[len(discounts) // 2]
+            stats["median_discount"] = round(mid, 2)
+        self.last_stats = stats
         return candidates
