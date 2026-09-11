@@ -1,25 +1,27 @@
 CryptoScanner — Real Trading Data Flow
 
-REAL AUTO TRADING — OBSERVED COIN MOVEMENT
+REAL AUTO TRADING — RIDE FORMING TRENDS
 1. Nobitex /market/stats (IRT/Rial markets) -> live local universe and books.
 2. CoinMarketCap listings + quotes for overlapping symbols -> USD prices this cycle.
 3. Engine stores CMC USD and Nobitex ask every scan and measures lookback movement.
-4. GlobalLeadEngine keeps a candidate when the coin is moving (CMC 1h or observed USD path)
-   and quality filters pass (spread, volume, freshness, BTC dump, local already done).
+4. A coin stays a candidate when the observed path (or CMC 1h) is still up
+   for consecutive scans, and quality filters pass (spread, volume, freshness,
+   BTC dump, fade). Nobitex already moving with the trend is allowed.
 5. It does not require Nobitex to be cheaper than CMC × USDT/IRT.
-6. Confirmed candidates go to the live SignalTracker and are shadowed on Paper Trading.
-7. Real SignalTracker -> TradingBot -> Nobitex order API.
-8. Fill confirmation -> native stop_market -> trailing -> exit.
+6. It does not use RSI / MACD / moving-average gates.
+7. Confirmed candidates go to the live SignalTracker and are shadowed on Paper Trading.
+8. Real SignalTracker -> TradingBot -> Nobitex order API.
+9. Fill confirmation -> native stop_market -> trailing -> exit.
 
 IMPORTANT
 - CoinMarketCap is intelligence only; it never receives orders.
 - Nobitex is the sole execution venue.
 - IRT balances and size are Rial, matching the Nobitex wallet.
-- Trading size, stops, and Global Lead live in SmartEagle Bot → Settings.
+- Trading size, stops, and trend filters live in SmartEagle Bot → Settings.
 - Scanner Settings is market-data API / display only.
 
 LOGGING
-- [REAL][GLOBAL→NOBITEX] = movement candidate
+- [REAL][GLOBAL→NOBITEX] = trend candidate
 - [REAL][NOBITEX] = live execution / monitoring
 - [PAPER] = paper workflow
 - [REAL][SAFETY] = protective-stop / emergency-exit

@@ -138,7 +138,10 @@ class RealTradingPanel(tk.Frame):
         if not self.tracker:
             return
         try:
-            self.tracker.pump_threshold_pct = float(getattr(self.config, "pump_threshold_pct", 5.0))
+            self.tracker.pump_threshold_pct = (
+                0.0 if self._using_app_live_tracker
+                else float(getattr(self.config, "pump_threshold_pct", 5.0))
+            )
             self.tracker.stop_loss_pct = float(getattr(self.config, "stop_loss_pct", 3.0))
             self.tracker.trailing_distance_pct = float(getattr(self.config, "trailing_distance_pct", 2.0))
             self.tracker.risk_per_trade_pct = float(getattr(self.config, "risk_per_trade_pct", 1.0))
@@ -251,7 +254,7 @@ class RealTradingPanel(tk.Frame):
             self.tracker = shared
             self.log(
                 "Live mode: attached to the main scanner tracker (real_trades.db). "
-                "Automatic entries stay on the Global Lead 30s cycle.",
+                "Automatic entries stay on the real-movement trend cycle.",
                 "info",
             )
         else:
@@ -1366,7 +1369,7 @@ class BotSettingsWindow(BaseDialog):
 
     def _build_strategy_section(self, parent) -> None:
         sf = tk.LabelFrame(
-            parent, text="🎯  Global Lead — coin movement",
+            parent, text="🎯  Real movement — ride forming trends",
             font=T.font(size=T.FONT_SM, weight="bold"),
             bg=T.BG_APP, fg=T.PRIMARY, padx=T.PAD_MD, pady=T.PAD_MD,
         )
@@ -1375,7 +1378,7 @@ class BotSettingsWindow(BaseDialog):
 
         tk.Label(
             sf,
-            text="Entries follow CMC / observed move. Nobitex vs CMC price gap is not used.",
+            text="Enter when CMC / stored prices keep rising. No indicators. Nobitex already moving is allowed.",
             font=T.font(size=T.FONT_XS),
             bg=T.BG_APP, fg=T.TEXT_MUTED,
         ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, T.PAD_SM))
@@ -1392,7 +1395,8 @@ class BotSettingsWindow(BaseDialog):
         ]
         int_fields = [
             ("check_interval_seconds", "Live scan interval (sec)", 15),
-            ("movement_lookback_scans", "Lookback scans for observed move", 3),
+            ("movement_lookback_scans", "Lookback scans for observed move", 6),
+            ("min_confirm_scans", "Trend confirm scans (hold the move)", 2),
             ("max_new_entries_per_cycle", "Max new entries per scan", 1),
         ]
         for key, label, default in float_fields:
@@ -1418,7 +1422,7 @@ class BotSettingsWindow(BaseDialog):
             value=bool(getattr(self.config, "enable_auto_trading", True))
         )
         ttk.Checkbutton(
-            sf, text="Enable auto trading (Global Lead)",
+            sf, text="Enable auto trading (real movement)",
             variable=self._enable_auto_trading_var,
         ).grid(row=row, column=1, sticky="w", pady=T.PAD_XS)
 
@@ -1637,10 +1641,10 @@ class BotSettingsWindow(BaseDialog):
         )
 
         self._confirmation_enabled_var = tk.BooleanVar(
-            value=bool(getattr(self.config, "confirmation_enabled", True))
+            value=bool(getattr(self.config, "confirmation_enabled", False))
         )
         ttk.Checkbutton(
-            ef, text="Enable entry confirmation",
+            ef, text="Wait for an extra price tick before entry (off = don't miss the trend)",
             variable=self._confirmation_enabled_var,
         ).grid(row=8, column=1, sticky="w", pady=T.PAD_XS)
 
@@ -1678,7 +1682,8 @@ class BotSettingsWindow(BaseDialog):
                 "max_global_quote_age_sec": 300.0,
                 "btc_max_dump_pct": 1.5,
                 "check_interval_seconds": 15,
-                "movement_lookback_scans": 3,
+                "movement_lookback_scans": 6,
+                "min_confirm_scans": 2,
                 "max_new_entries_per_cycle": 1,
             }
             for key, value in defaults.items():
@@ -1691,7 +1696,7 @@ class BotSettingsWindow(BaseDialog):
         if hasattr(self, "_min_notional_var"):
             self._min_notional_var.set(self._money_to_display(300000.0))
         if hasattr(self, "_confirmation_enabled_var"):
-            self._confirmation_enabled_var.set(True)
+            self._confirmation_enabled_var.set(False)
         if hasattr(self, "_confirmation_pct_var"):
             self._confirmation_pct_var.set(0.35)
 
@@ -1761,7 +1766,10 @@ class BotSettingsWindow(BaseDialog):
         self.config.quote_unit = "rial"
         if hasattr(self, "_enable_auto_trading_var"):
             self.config.enable_auto_trading = bool(self._enable_auto_trading_var.get())
-        int_keys = {"check_interval_seconds", "movement_lookback_scans", "max_new_entries_per_cycle"}
+        int_keys = {
+            "check_interval_seconds", "movement_lookback_scans",
+            "max_new_entries_per_cycle", "min_confirm_scans",
+        }
         for key, var in getattr(self, "_strategy_vars", {}).items():
             if key in int_keys:
                 setattr(self.config, key, self._get_int_or(var, int(getattr(self.config, key, 1))))
@@ -1788,7 +1796,7 @@ class BotSettingsWindow(BaseDialog):
                 getattr(self.config, "max_new_entries_per_cycle", 1) or 1
             )
             app.real_signal_tracker.confirmation_enabled = bool(
-                getattr(self.config, "confirmation_enabled", True)
+                getattr(self.config, "confirmation_enabled", False)
             )
             app.real_signal_tracker.confirmation_pct = float(
                 getattr(self.config, "confirmation_pct", 0.35)

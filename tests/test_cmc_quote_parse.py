@@ -103,16 +103,16 @@ def test_iter_cmc_coins_accepts_dict_and_list_data():
 
 def test_v3_list_quote_payload_produces_global_lead_candidate():
     payload = {"data": [_v3_coin()]}
-    engine = GlobalLeadEngine(global_pump_pct=3)
+    engine = GlobalLeadEngine(global_pump_pct=3, min_confirm_scans=1)
     out = engine.evaluate(local(), payload, now=1000)
     assert len(out) == 1
     assert out[0]["GlobalPriceUSD"] == 10.0
-    assert "Global Lead Buy" in out[0]["Signal"]
+    assert "Trend Buy" in out[0]["Signal"]
 
 
 def test_v3_camelcase_payload_produces_global_lead_candidate():
     payload = {"data": [_v3_coin(camel=True)]}
-    engine = GlobalLeadEngine(global_pump_pct=3)
+    engine = GlobalLeadEngine(global_pump_pct=3, min_confirm_scans=1)
     out = engine.evaluate(local(), payload, now=1000)
     assert len(out) == 1
 
