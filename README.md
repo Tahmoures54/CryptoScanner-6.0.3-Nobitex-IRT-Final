@@ -32,25 +32,24 @@ The strategy does not generate synthetic/random market prices.
 
 At each scan CryptoScanner stores the actual CMC USD price observed for an asset **and** the live Nobitex ask. Entry is based on that stored path (lookback scans), not on a synthetic price generator. CMC's rolling 1h field is only a confirmation; a falling observed path blocks the trade.
 
-Recommended initial settings for a live account:
+Recommended initial settings for a live or paper account:
 
-- CMC 1h move: 1.2% (or observed lookback move 0.7%)
-- Lookback: 6 scans
+- CMC 1h move: 2.0% (or observed lookback move 1.2%)
+- Lookback: 8 scans
 - Trend confirm scans: 2
 - Scan interval: 15 seconds
-- Max Nobitex spread: 2.5%
-- Max open positions: 1–3
-- Max total exposure: 50% or lower
-- Max position: 25% or lower
-- Stop Loss: 3%
-- Trailing Distance: 1.5%
-- Extra entry-tick confirmation: **OFF** (the engine already requires 2 scans)
+- Max Nobitex spread: 1.0%
+- Min CMC 24h volume: $1,000,000
+- Max open positions: 3
+- Stop Loss: 2.2%
+- Trailing activation: 1.5%
+- Trailing distance: 4.0% (winners can run; no take-profit cap)
+- Extra entry-tick confirmation: **OFF**
+- Paper uses the same rules and the full Nobitex book for exits
 - Auto Trading: **OFF until connection diagnostics pass**
 - IRT amounts are Rial (same as the Nobitex wallet)
 
-Entry is a forming price trend, not a Nobitex vs CMC price-gap and not an indicator stack.
-
-These are software defaults, not financial recommendations.
+These are software defaults, not a profit guarantee.
 
 ## Paper Trading
 

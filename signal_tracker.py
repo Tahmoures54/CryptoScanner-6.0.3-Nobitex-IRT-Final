@@ -107,10 +107,12 @@ class SignalTracker:
         self.min_market_cap = float(min_market_cap)
 
         self.pump_threshold_pct = 5.0
-        self.trailing_distance_pct = 2.0
-        self.stop_loss_pct = 3.0
+        self.trailing_distance_pct = 4.0
+        self.trailing_activation_pct = 1.5
+        self.stop_loss_pct = 2.2
         self.trailing_stop_enabled = True
         self.take_profit_percent = 0.0
+        self.trading_fee_pct = 0.1
         self.use_risk_filter = False
         self.blocked_risk_levels = ["High", "Extreme"]
         self.min_quality = 0.0
@@ -468,6 +470,10 @@ class SignalTracker:
         )
         self.pump_threshold_pct = _num("pump_threshold_pct", self.pump_threshold_pct)
         self.trailing_distance_pct = _num("trailing_distance_pct", self.trailing_distance_pct)
+        self.trailing_activation_pct = _num(
+            ("trailing_activation_pct", "trail_activation_pct"),
+            self.trailing_activation_pct,
+        )
         self.stop_loss_pct = _num("stop_loss_pct", self.stop_loss_pct)
         self.risk_per_trade_pct = _num("risk_per_trade_pct", self.risk_per_trade_pct)
         self.fixed_position_quote = _num(
@@ -509,6 +515,7 @@ class SignalTracker:
         self.max_chase_pct = _num("max_chase_pct", self.max_chase_pct)
         self.min_quality = _num("min_quality", self.min_quality)
         self.take_profit_percent = _num("take_profit_percent", self.take_profit_percent)
+        self.trading_fee_pct = _num("trading_fee_pct", self.trading_fee_pct)
 
         self.auto_trading_enabled = _bool("enable_auto_trading", self.auto_trading_enabled)
         self.trailing_stop_enabled = _bool("trailing_stop_enabled", self.trailing_stop_enabled)
@@ -530,9 +537,11 @@ class SignalTracker:
         if self.pump_threshold_pct <= 0:
             self.pump_threshold_pct = 5.0
         if self.trailing_distance_pct <= 0:
-            self.trailing_distance_pct = 2.0
+            self.trailing_distance_pct = 4.0
+        if getattr(self, "trailing_activation_pct", 0) < 0:
+            self.trailing_activation_pct = 0.0
         if self.stop_loss_pct <= 0:
-            self.stop_loss_pct = 3.0
+            self.stop_loss_pct = 2.2
         if self.max_drawdown_percent <= 0 or self.max_drawdown_percent > 50:
             self.max_drawdown_percent = 15.0
         if self.max_total_exposure_pct <= 0 or self.max_total_exposure_pct > 100:
@@ -616,9 +625,10 @@ class SignalTracker:
             "trailing_stop_enabled": self.trailing_stop_enabled,
             "trailing_distance_pct": self.trailing_distance_pct,
             "take_profit_percent": self.take_profit_percent,
-            "trading_fee_pct": 0.1,
+            "trading_fee_pct": float(getattr(self, "trading_fee_pct", 0.1) or 0.1),
             "position_size": 100.0,
-            "trail_activation_pct": 0.0,
+            "trail_activation_pct": float(getattr(self, "trailing_activation_pct", 0.0) or 0.0),
+            "trailing_activation_pct": float(getattr(self, "trailing_activation_pct", 0.0) or 0.0),
         }
 
     def set_paper_trade_params(self, size=None, tp=None, sl=None, capital=None, max_open=None):
@@ -1516,10 +1526,13 @@ class SignalTracker:
         cur.execute(
             "INSERT INTO trades (trade_uid, asset_key, symbol, entry_time, entry_price, "
             "entry_signal, status, side, position_size, current_stop_loss, sl_pct, "
-            "trail_distance_pct, extreme_price, notional, fees_paid, be_locked, protective_order_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, 'open', 'long', ?, ?, ?, ?, ?, ?, ?, 0, ?)",
+            "trail_distance_pct, trail_activation_pct, tp_pct, extreme_price, notional, "
+            "fees_paid, be_locked, protective_order_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'open', 'long', ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)",
             (trade_uid, asset_key, symbol, self._now_str(), entry_price, signal_text,
              pos_size, initial_sl_price, sl_pct, self.trailing_distance_pct,
+             float(getattr(self, "trailing_activation_pct", 0.0) or 0.0),
+             float(self.take_profit_percent or 0.0),
              entry_price, notional, entry_fee, None),
         )
 

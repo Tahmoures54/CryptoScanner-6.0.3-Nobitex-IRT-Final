@@ -1,8 +1,10 @@
 {
-  "size": "100",
-  "tp": "25",
-  "sl": "3.0",
-  "max_open": "10",
-  "capital": "1000",
-  "pump": "3"
+  "size": "750000",
+  "tp": "0",
+  "sl": "2.2",
+  "max_open": "3",
+  "capital": "10000000",
+  "trailing_enabled": true,
+  "trailing_distance": "4.0",
+  "trailing_activation": "1.5"
 }

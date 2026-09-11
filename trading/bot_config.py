@@ -99,15 +99,15 @@ class BotConfig:
     # ── Account / Risk ───────────────────────────────────────
     account_balance: float = 1000.0
     risk_per_trade_pct: float = 1.0
-    max_open_positions: int = 5
-    max_drawdown_percent: float = 20.0
+    max_open_positions: int = 3
+    max_drawdown_percent: float = 10.0
     halt_on_max_drawdown: bool = True
 
     # ── Pure Price Action / Real Movement Strategy ──────────
     pump_threshold_pct: float = 3.0
-    movement_lookback_scans: int = 6
-    stop_loss_pct: float = 3.0
-    trailing_distance_pct: float = 1.5
+    movement_lookback_scans: int = 8
+    stop_loss_pct: float = 2.2
+    trailing_distance_pct: float = 4.0
     trailing_activation_pct: float = 1.5
     trailing_stop_enabled: bool = True
     take_profit_percent: float = 0.0
@@ -121,12 +121,12 @@ class BotConfig:
     max_total_exposure_pct: float = 50.0
 
     # ── Filters ─────────────────────────────────────────────
-    min_volume_24h: float = 100000.0
+    min_volume_24h: float = 2_000_000.0
     min_market_cap: float = 0.0
 
     # ── Cooldowns ────────────────────────────────────────────
     cooldown_after_loss_min: int = 15
-    cooldown_after_win_min: int = 15
+    cooldown_after_win_min: int = 5
     entry_cooldown_seconds: int = 300
 
     # ── Automation / Notifications ───────────────────────────
@@ -140,7 +140,7 @@ class BotConfig:
     confirmation_pct: float = 0.35
     confirmation_max_minutes: int = 8
     invalidation_pct: float = 1.0
-    max_chase_pct: float = 1.0
+    max_chase_pct: float = 0.7
     min_quality: float = 0.4
     blocked_risk_levels: List[str] = field(default_factory=lambda: ["High", "Extreme"])
     reverse_signal_exit_enabled: bool = True
@@ -149,23 +149,24 @@ class BotConfig:
     # ── Real-movement trend follow (CMC intelligence → Nobitex) ──
     strategy: str = "global_lead_local_lag"
     global_signal_source: str = "CoinMarketCap"
-    global_pump_threshold_pct: float = 1.2
+    global_pump_threshold_pct: float = 2.0
     min_nobitex_discount_pct: float = 0.0
     max_nobitex_discount_pct: float = 18.0
-    max_nobitex_spread_pct: float = 2.5
-    min_global_volume_usd: float = 250_000.0
+    max_nobitex_spread_pct: float = 1.0
+    min_global_volume_usd: float = 1_000_000.0
     max_global_quote_age_sec: float = 300.0
     max_local_fall_pct: float = 0.8
     global_scan_limit: int = 500
     min_confirm_scans: int = 2
-    min_observed_move_pct: float = 0.7
-    max_local_24h_pct: float = 20.0
+    min_observed_move_pct: float = 1.2
+    max_local_24h_pct: float = 15.0
     min_global_24h_pct: float = -5.0
     min_volume_change_24h_pct: float = -30.0
-    btc_max_dump_pct: float = 1.5
+    btc_max_dump_pct: float = 1.0
     cmc_listings_ttl_sec: float = 45.0
     min_ask_depth_quote: float = 0.0
     max_local_premium_pct: float = 0.0
+    strategy_defaults_version: int = 2
 
     # ── File Paths ───────────────────────────────────────────
     trade_log_file: str = field(default_factory=lambda: os.path.join(APPDATA_DIR, "trade_history.json"))
@@ -230,7 +231,7 @@ class BotConfig:
             "check_interval_seconds", "entry_cooldown_seconds",
             "cooldown_after_loss_min", "cooldown_after_win_min",
             "max_new_entries_per_cycle", "confirmation_max_minutes",
-            "global_scan_limit", "min_confirm_scans",
+            "global_scan_limit", "min_confirm_scans", "strategy_defaults_version",
         }
         _float_fields = {
             "account_balance", "risk_per_trade_pct", "stop_loss_pct",
@@ -304,6 +305,31 @@ def _botconfig_init(self, *args, **kwargs):
 BotConfig.__init__ = _botconfig_init  # type: ignore[method-assign]
 
 
+# One-time overlay for installs still on the lag-era / tight-trail factory numbers.
+# Does not touch credentials, balance, or fixed position size.
+TREND_EV_DEFAULTS: Dict[str, Any] = {
+    "strategy_defaults_version": 2,
+    "global_pump_threshold_pct": 2.0,
+    "min_observed_move_pct": 1.2,
+    "max_nobitex_spread_pct": 1.0,
+    "min_global_volume_usd": 1_000_000.0,
+    "min_volume_24h": 2_000_000.0,
+    "max_chase_pct": 0.7,
+    "btc_max_dump_pct": 1.0,
+    "max_local_24h_pct": 15.0,
+    "movement_lookback_scans": 8,
+    "min_confirm_scans": 2,
+    "stop_loss_pct": 2.2,
+    "trailing_distance_pct": 4.0,
+    "trailing_activation_pct": 1.5,
+    "take_profit_percent": 0.0,
+    "confirmation_enabled": False,
+    "max_open_positions": 3,
+    "max_new_entries_per_cycle": 1,
+    "cooldown_after_win_min": 5,
+}
+
+
 def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
     path = _resolve_config_path(file_path)
     if not os.path.exists(path):
@@ -327,6 +353,9 @@ def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
 
             data.pop("api_key_encrypted", None)
             data.pop("api_secret_encrypted", None)
+
+            if int(data.get("strategy_defaults_version") or 0) < 2:
+                data.update(TREND_EV_DEFAULTS)
 
             cfg = BotConfig.from_dict(data)
             # Nobitex spot trading is configured in Rial by default.  Keep the

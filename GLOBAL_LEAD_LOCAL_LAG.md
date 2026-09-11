@@ -45,17 +45,18 @@ scans, are already falling.
 
 Default production gates:
 
-- CMC 1h move >= 1.2% **or** observed CMC move >= 0.7%
+- CMC 1h move >= 2.0% **or** observed CMC move >= 1.2%
 - Trend must hold for 2 scans
-- Lookback 6 scans (~90s at a 15s interval)
+- Lookback 8 scans (~2 min at a 15s interval)
 - Stored CMC path not falling / not fading
-- Nobitex spread <= 2.5%
-- Global 24h volume >= $250,000
+- Nobitex spread <= 1.0%
+- Global 24h volume >= $1,000,000
 - Global quote age <= 300 seconds
-- Nobitex local volume >= 500,000 IRT (Rial)
-- Local 24h already-pumped cap 20%
-- Skip alts when BTC dumps more than 1.5%
-- Maximum chase (ask vs last) <= 1.2%
+- Nobitex local volume >= 2,000,000 IRT (Rial)
+- Local 24h already-pumped cap 15%
+- Skip alts when BTC dumps more than 1.0%
+- Maximum chase (ask vs last) <= 0.7%
+- Stop 2.2%; trail activates at 1.5% profit with 4% distance; no take-profit cap
 
 These are risk/quality filters, not profit guarantees.
 

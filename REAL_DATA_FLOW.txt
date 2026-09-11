@@ -9,7 +9,8 @@ REAL AUTO TRADING — RIDE FORMING TRENDS
    BTC dump, fade). Nobitex already moving with the trend is allowed.
 5. It does not require Nobitex to be cheaper than CMC × USDT/IRT.
 6. It does not use RSI / MACD / moving-average gates.
-7. Confirmed candidates go to the live SignalTracker and are shadowed on Paper Trading.
+7. Confirmed candidates go to the live SignalTracker. Paper Trading gets the
+   same engine rows plus the full Nobitex book so open paper trades can trail/exit.
 8. Real SignalTracker -> TradingBot -> Nobitex order API.
 9. Fill confirmation -> native stop_market -> trailing -> exit.
 

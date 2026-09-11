@@ -53,13 +53,14 @@ class PaperTradingPanel(tk.Frame):
 
     # Default values for paper trade settings (not shown in UI)
     DEFAULT_PAPER_SETTINGS = {
-        "size": "100",
-        "tp": "15.0",
-        "sl": "3.0",
-        "max_open": "10",
-        "capital": "1000",
+        "size": "750000",
+        "tp": "0",
+        "sl": "2.2",
+        "max_open": "3",
+        "capital": "10000000",
         "trailing_enabled": True,
-        "trailing_distance": "1.5",
+        "trailing_distance": "4.0",
+        "trailing_activation": "1.5",
     }
 
     def __init__(self, parent: tk.Widget, main_app: Any) -> None:
@@ -118,18 +119,45 @@ class PaperTradingPanel(tk.Frame):
         if not self.tracker:
             return
         try:
-            size = float(settings.get("size", 100))
-            tp = float(settings.get("tp", 15.0))
-            sl = float(settings.get("sl", 3.0))
-            max_open = int(settings.get("max_open", 10))
-            capital = float(settings.get("capital", 1000))
-            trailing_distance = float(settings.get("trailing_distance", 1.5))
+            cfg = getattr(self.main_app, "_bot_cfg", None)
+            if cfg is not None:
+                self.tracker.pump_threshold_pct = 0.0
+                self.tracker.ignore_signal_filters = True
+                self.tracker.confirmation_enabled = False
+                self.tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 2.2) or 2.2)
+                self.tracker.trailing_distance_pct = float(
+                    getattr(cfg, "trailing_distance_pct", 4.0) or 4.0
+                )
+                self.tracker.trailing_activation_pct = float(
+                    getattr(cfg, "trailing_activation_pct", 1.5) or 1.5
+                )
+                self.tracker.trailing_stop_enabled = True
+                self.tracker.take_profit_percent = float(
+                    getattr(cfg, "take_profit_percent", 0.0) or 0.0
+                )
+                self.tracker.max_open_trades = int(
+                    getattr(cfg, "max_open_positions", 3) or 3
+                )
+                self.tracker.position_size_mode = "fixed"
+                self.tracker.fixed_position_quote = float(
+                    getattr(cfg, "fixed_position_quote", 750000.0) or 750000.0
+                )
+                return
+            size = float(settings.get("size", 750000))
+            tp = float(settings.get("tp", 0.0))
+            sl = float(settings.get("sl", 2.2))
+            max_open = int(settings.get("max_open", 3))
+            capital = float(settings.get("capital", 10_000_000))
+            trailing_distance = float(settings.get("trailing_distance", 4.0))
             trailing_enabled = bool(settings.get("trailing_enabled", True))
 
-            self.tracker.pump_threshold_pct = 0.0  # non relevant, ignored
+            self.tracker.pump_threshold_pct = 0.0
             self.tracker.trailing_distance_pct = trailing_distance
+            self.tracker.trailing_activation_pct = float(
+                settings.get("trailing_activation", 1.5)
+            )
             self.tracker.trailing_stop_enabled = trailing_enabled
-            self.tracker.ignore_signal_filters = True  # all signals accepted
+            self.tracker.ignore_signal_filters = True
             self.tracker.min_volume_24h = 0.0
             self.tracker.min_market_cap = 0.0
             self.tracker.set_paper_trade_params(

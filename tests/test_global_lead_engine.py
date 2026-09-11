@@ -218,3 +218,41 @@ def test_bot_config_keeps_global_lead_fields(tmp_path):
     assert loaded.quote_unit == "rial"
     assert loaded.min_confirm_scans == 2
     assert loaded.confirmation_enabled is False
+
+
+def test_wide_spread_is_rejected():
+    e = engine(global_pump_pct=3, max_spread_pct=1.0)
+    out = e.evaluate(local(ask=1_020_000, bid=1_000_000), cmc(), now=1000)
+    assert out == []
+
+
+def test_old_config_without_version_gets_asymmetric_defaults(tmp_path):
+    path = tmp_path / "old.json"
+    path.write_text(
+        '{"exchange": "nobitex", "global_pump_threshold_pct": 1.2, '
+        '"max_nobitex_spread_pct": 2.5, "trailing_distance_pct": 1.5}',
+        encoding="utf-8",
+    )
+    loaded = load_config(str(path))
+    assert loaded.global_pump_threshold_pct == 2.0
+    assert loaded.max_nobitex_spread_pct == 1.0
+    assert loaded.trailing_distance_pct == 4.0
+    assert loaded.stop_loss_pct == 2.2
+    assert loaded.take_profit_percent == 0.0
+    assert loaded.strategy_defaults_version == 2
+
+
+def test_saved_v2_config_is_not_overwritten(tmp_path):
+    cfg = BotConfig.from_dict({
+        "strategy_defaults_version": 2,
+        "global_pump_threshold_pct": 1.8,
+        "max_nobitex_spread_pct": 0.8,
+        "trailing_distance_pct": 5.0,
+    })
+    path = str(tmp_path / "v2.json")
+    assert save_config(cfg, path)
+    loaded = load_config(path)
+    assert loaded.global_pump_threshold_pct == 1.8
+    assert loaded.max_nobitex_spread_pct == 0.8
+    assert loaded.trailing_distance_pct == 5.0
+
