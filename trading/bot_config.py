@@ -149,22 +149,23 @@ class BotConfig:
     # ── Global Lead / Local Lag (CMC → Nobitex) ──────────────
     strategy: str = "global_lead_local_lag"
     global_signal_source: str = "CoinMarketCap"
-    global_pump_threshold_pct: float = 2.5
-    min_nobitex_discount_pct: float = 1.2
+    global_pump_threshold_pct: float = 1.8
+    min_nobitex_discount_pct: float = 0.4
     max_nobitex_discount_pct: float = 18.0
-    max_nobitex_spread_pct: float = 1.0
+    max_nobitex_spread_pct: float = 2.2
     min_global_volume_usd: float = 300_000.0
-    max_global_quote_age_sec: float = 120.0
+    max_global_quote_age_sec: float = 240.0
     max_local_fall_pct: float = 0.5
     global_scan_limit: int = 500
     min_confirm_scans: int = 1
-    min_observed_move_pct: float = 0.45
+    min_observed_move_pct: float = 0.6
     max_local_24h_pct: float = 16.0
     min_global_24h_pct: float = -4.0
     min_volume_change_24h_pct: float = -20.0
     btc_max_dump_pct: float = 1.5
     cmc_listings_ttl_sec: float = 45.0
     min_ask_depth_quote: float = 0.0
+    max_local_premium_pct: float = 1.5
 
     # ── File Paths ───────────────────────────────────────────
     trade_log_file: str = field(default_factory=lambda: os.path.join(APPDATA_DIR, "trade_history.json"))
@@ -245,6 +246,7 @@ class BotConfig:
             "max_local_fall_pct", "min_observed_move_pct", "max_local_24h_pct",
             "min_global_24h_pct", "min_volume_change_24h_pct",
             "btc_max_dump_pct", "cmc_listings_ttl_sec", "min_ask_depth_quote",
+            "max_local_premium_pct",
         }
         _bool_fields = {
             "testnet", "spot_mode", "halt_on_max_drawdown", "enable_auto_trading",

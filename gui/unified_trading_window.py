@@ -1,4 +1,4 @@
-﻿# gui/unified_trading_window.py
+# gui/unified_trading_window.py
 from __future__ import annotations
 
 import logging
@@ -31,7 +31,8 @@ class UnifiedTradingWindow(tk.Toplevel):
         parent: tk.Widget,
         main_app: Any,
         initial_tab: str | int = "paper",
-        use_emojis: bool = True
+        use_emojis: bool = True,
+        open_settings: bool = False,
     ):
         super().__init__(parent)
         self.main_app = main_app
@@ -63,6 +64,11 @@ class UnifiedTradingWindow(tk.Toplevel):
 
         # Center window relative to parent
         self._center_window()
+
+        if open_settings:
+            panel = self._panels.get(self.TAB_REAL)
+            if panel is not None and hasattr(panel, "open_bot_settings"):
+                self.after(150, panel.open_bot_settings)
 
         # Bind close event
         self.protocol("WM_DELETE_WINDOW", self._on_close)

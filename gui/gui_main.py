@@ -254,34 +254,105 @@ class CryptoScannerApp:
                     logger.info("[REAL] Live Nobitex tracker ready for SEND; 30s auto-scan is off.")
             else:
                 logger.warning("[REAL] Automatic Nobitex trading is not ready; manual/paper mode remains available.")
+            self._configure_paper_tracker()
         except Exception as exc:
             logger.error("[REAL] Auto-trading initialization failed: %s", exc, exc_info=True)
             self.real_signal_tracker = None
             self.real_auto_enabled = False
 
+    def _configure_paper_tracker(self) -> None:
+        """Paper tracker shadows Global Lead without sending Nobitex orders."""
+        st = self.signal_tracker
+        if st is None:
+            return
+        cfg = self._bot_cfg
+        cash = 10_000_000.0
+        if self.trading_bot:
+            cash = max(float(getattr(self.trading_bot, "current_balance", 0.0) or 0.0), cash)
+        st.quote_currency = "IRT"
+        st.executor = None
+        st.mode = "paper"
+        st.ignore_signal_filters = True
+        st.confirmation_enabled = False
+        st.pump_threshold_pct = 0.0
+        st.min_volume_24h = 0.0
+        st.min_market_cap = 0.0
+        st.min_notional_quote = 0.0
+        st.account_balance = cash
+        st.initial_balance = cash
+        st.cash = cash
+        if cfg is not None:
+            st.max_open_trades = int(getattr(cfg, "max_open_trades", 3) or 3)
+            st.position_size_mode = str(getattr(cfg, "position_size_mode", "fixed") or "fixed").lower()
+            st.fixed_position_quote = float(getattr(cfg, "fixed_position_quote", 750000.0) or 750000.0)
+            st.min_notional_quote = float(getattr(cfg, "min_notional_quote", 300000.0) or 0.0)
+            st.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 3.0) or 3.0)
+        logger.info("[PAPER] Global Lead paper shadow ready (simulated fills only).")
+
+    def _paper_shadow_global_lead(self, hits: List[Dict[str, Any]]) -> None:
+        if not hits or self.signal_tracker is None:
+            return
+        st = self.signal_tracker
+        was = st.auto_trading_enabled
+        st.auto_trading_enabled = True
+        st.ignore_signal_filters = True
+        st.confirmation_enabled = False
+        st.pump_threshold_pct = 0.0
+        st.min_notional_quote = 0.0
+        if float(getattr(st, "cash", 0) or 0) < 1_000_000:
+            st.cash = 10_000_000.0
+            st.account_balance = 10_000_000.0
+        try:
+            result = st.process_new_signals(hits)
+            if result.get("opened") or result.get("pending") or result.get("closed"):
+                logger.info(
+                    "[PAPER][GLOBAL] opened=%s pending=%s closed=%s",
+                    result.get("opened"), result.get("pending"), result.get("closed"),
+                )
+        except Exception as exc:
+            logger.warning("[PAPER][GLOBAL] Paper shadow failed: %s", exc)
+        finally:
+            st.auto_trading_enabled = was
+
     def _configure_global_lead_engine(self, cfg) -> None:
+        raw_spread = float(getattr(cfg, "max_nobitex_spread_pct", 2.0) or 2.0)
+        raw_discount = float(getattr(cfg, "min_nobitex_discount_pct", 0.4) or 0.0)
+        raw_age = float(getattr(cfg, "max_global_quote_age_sec", 240.0) or 240.0)
+        # IRT books are wider and often sit at a small premium to CMC*USDT.
+        spread = max(raw_spread, 2.0)
+        discount = min(raw_discount, 0.5) if raw_discount > 0 else raw_discount
+        age = max(raw_age, 180.0)
         kwargs = dict(
-            global_pump_pct=float(getattr(cfg, "global_pump_threshold_pct", 2.5)),
-            min_discount_pct=float(getattr(cfg, "min_nobitex_discount_pct", 1.2)),
+            global_pump_pct=float(getattr(cfg, "global_pump_threshold_pct", 1.8)),
+            min_discount_pct=discount,
             max_discount_pct=float(getattr(cfg, "max_nobitex_discount_pct", 18.0)),
-            max_spread_pct=float(getattr(cfg, "max_nobitex_spread_pct", 1.0)),
+            max_spread_pct=spread,
             min_global_volume_usd=float(getattr(cfg, "min_global_volume_usd", 300000.0)),
-            max_global_quote_age_sec=float(getattr(cfg, "max_global_quote_age_sec", 120.0)),
+            max_global_quote_age_sec=age,
             min_local_volume_irt=float(getattr(cfg, "min_volume_24h", 1000000.0)),
             max_local_fall_pct=float(getattr(cfg, "max_local_fall_pct", 0.5)),
             max_chase_pct=float(getattr(cfg, "max_chase_pct", 1.0)),
-            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 6) or 6),
+            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 4) or 4),
             min_confirm_scans=int(getattr(cfg, "min_confirm_scans", 1) or 1),
-            min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 0.45)),
+            min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 0.6)),
             max_local_24h_pct=float(getattr(cfg, "max_local_24h_pct", 16.0)),
             min_global_24h_pct=float(getattr(cfg, "min_global_24h_pct", -4.0)),
             min_volume_change_24h_pct=float(getattr(cfg, "min_volume_change_24h_pct", -20.0)),
             btc_max_dump_pct=float(getattr(cfg, "btc_max_dump_pct", 1.5)),
+            max_local_premium_pct=float(getattr(cfg, "max_local_premium_pct", 1.5) or 0.0),
         )
         if self.global_lead_engine is None:
             self.global_lead_engine = GlobalLeadEngine(**kwargs)
         else:
             self.global_lead_engine.configure(**kwargs)
+        logger.info(
+            "[REAL][GLOBAL] Engine filters | pump=%.2f obs=%.2f disc=%.2f spread=%.2f "
+            "premium=%.2f lookback=%d age=%.0fs",
+            kwargs["global_pump_pct"], kwargs["min_observed_move_pct"],
+            kwargs["min_discount_pct"], kwargs["max_spread_pct"],
+            kwargs["max_local_premium_pct"], kwargs["movement_lookback_scans"],
+            kwargs["max_global_quote_age_sec"],
+        )
 
     def _real_scan_interval_ms(self) -> int:
         cfg = self._bot_cfg
@@ -343,10 +414,17 @@ class CryptoScannerApp:
         listings = self._refresh_cmc_listings(global_limit, ttl)
         wanted = [str(s).upper() for s in local_symbols if str(s).upper() not in {"USDT", "USDC", "IRT", "RLS"}]
         ids = [self._cmc_id_by_symbol[s] for s in wanted if s in self._cmc_id_by_symbol]
+        logger.info(
+            "[REAL][GLOBAL] CMC overlap | nobitex=%d | mapped_ids=%d | quote_ids=%d",
+            len(wanted), len(self._cmc_id_by_symbol), len(ids),
+        )
         if ids and hasattr(self.cmc_client, "get_quotes_batched"):
             try:
                 quotes = self.cmc_client.get_quotes_batched(ids=ids, convert="USD", batch_size=100)
-                if isinstance(quotes, dict) and quotes.get("data"):
+                rows = (quotes or {}).get("data") if isinstance(quotes, dict) else None
+                n = len(rows) if isinstance(rows, dict) else len(rows or [])
+                if n:
+                    logger.info("[REAL][GLOBAL] Fresh CMC quotes | rows=%d", n)
                     return quotes
             except Exception as exc:
                 logger.warning("[REAL][GLOBAL] Fresh CMC quotes unavailable, using listings cache: %s", exc)
@@ -462,6 +540,10 @@ class CryptoScannerApp:
                         candidates = self.global_lead_engine.evaluate(
                             live_rows, global_payload, usdt_irt, now=now
                         )
+                        logger.info(
+                            "[REAL][GLOBAL] Filters | %s",
+                            self.global_lead_engine.stats_line(),
+                        )
                         min_depth = float(getattr(cfg, "min_ask_depth_quote", 0.0) or 0.0) if cfg else 0.0
                         if min_depth > 0:
                             candidates = [
@@ -495,11 +577,13 @@ class CryptoScannerApp:
                     )
 
             logger.info(
-                "[REAL] Scan complete | Nobitex markets=%d | CMC opportunities=%d | strategy=OBSERVED_GLOBAL_LEAD",
-                len(live_rows), len(candidates),
+                "[REAL] Scan complete | Nobitex markets=%d | CMC opportunities=%d | strategy=OBSERVED_GLOBAL_LEAD | interval=%ss",
+                len(live_rows), len(candidates), self._real_scan_interval_ms() // 1000,
             )
+            paper_hits = [row for row in live_rows if self._is_entry_signal(row.get("Signal"))]
+            self._paper_shadow_global_lead(paper_hits)
             result = self.real_signal_tracker.process_new_signals(live_rows)
-            if result.get("opened") or result.get("closed"):
+            if result.get("opened") or result.get("closed") or result.get("pending"):
                 logger.info(
                     "[REAL][NOBITEX] Execution result | opened=%s closed=%s pending=%s resized=%s",
                     result.get("opened"), result.get("closed"), result.get("pending"),
@@ -1550,6 +1634,14 @@ class CryptoScannerApp:
             UnifiedTradingWindow(self.root, self, initial_tab=1)
         else:
             self._show_bot_locked()
+
+    def open_bot_settings(self):
+        """Open SmartEagle Bot on the live tab, then Bot Settings."""
+        if not self._has_bot_access():
+            self._show_bot_locked()
+            return
+        from gui.unified_trading_window import UnifiedTradingWindow
+        UnifiedTradingWindow(self.root, self, initial_tab=1, open_settings=True)
 
     def open_signal_performance(self):
         try:
