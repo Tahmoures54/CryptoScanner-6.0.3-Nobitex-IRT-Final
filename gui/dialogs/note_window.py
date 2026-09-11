@@ -216,7 +216,7 @@ class NoteWindow(BaseDialog):
             command=self._load_and_display,
         ).pack(side="right")
 
-        ToolTip(hdr.winfo_children()[-1], "بارگذاری مجدد یادداشت‌ها")
+        ToolTip(hdr.winfo_children()[-1], "Reload notes")
 
         # ── جستجو ─────────────────────────────────────────────
         search_frame = tk.Frame(section, bg=T.BG_APP)
@@ -237,7 +237,7 @@ class NoteWindow(BaseDialog):
         )
         search_entry.pack(side="left", fill="x", expand=True)
         self._search_var.trace_add("write", lambda *_: self._filter_notes())
-        ToolTip(search_entry, "جستجو در یادداشت‌ها")
+        ToolTip(search_entry, "Search notes")
 
         tk.Button(
             search_frame,
@@ -379,7 +379,7 @@ class NoteWindow(BaseDialog):
             command=self._confirm_clear,
         )
         clear_btn.pack(side="left")
-        ToolTip(clear_btn, "حذف تمام یادداشت‌های ذخیره‌شده")
+        ToolTip(clear_btn, "Delete all saved notes")
 
         # دکمه‌های Save و Cancel (سمت راست)
         self._add_ok_cancel(

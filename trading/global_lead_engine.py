@@ -1,17 +1,11 @@
-"""Global-lead / local-lag opportunity engine.
+"""Global-move engine for Nobitex IRT execution.
 
 Market intelligence is CoinMarketCap. Execution venue is Nobitex IRT.
-Fair IRT value = CMC USD price x live Nobitex USDT/IRT ask.
 
-The engine never places orders. It produces auditable candidates from
-*observed* prices stored across scans, not from a synthetic generator.
-
-Real-movement rules:
-- Store the actual CMC USD price and Nobitex IRT ask on every cycle.
-- Prefer the move we measured between scans over CMC's rolling 1h field.
-- Reject a green CMC 1h print when our own CMC path is already falling.
-- Enter only while Nobitex is still discounted vs global fair value and
-  local price has not already caught up.
+The engine never places orders. It scores coins by *observed movement*
+(CMC USD path we stored + CMC 1h), then applies a short quality filter
+on the Nobitex book. It does not compare Nobitex ask to a CMC fair IRT
+price and does not require a local discount or premium.
 """
 from __future__ import annotations
 
@@ -49,28 +43,24 @@ class GlobalLeadEngine:
     def __init__(
         self,
         *,
-        global_pump_pct: float = 3.0,
-        min_discount_pct: float = 1.5,
-        max_discount_pct: float = 25.0,
-        max_spread_pct: float = 1.2,
+        global_pump_pct: float = 1.2,
+        max_spread_pct: float = 2.5,
         min_global_volume_usd: float = 250_000.0,
-        max_global_quote_age_sec: float = 180.0,
-        min_local_volume_irt: float = 1_000_000.0,
-        max_local_fall_pct: float = 0.75,
-        max_chase_pct: float = 1.0,
+        max_global_quote_age_sec: float = 300.0,
+        min_local_volume_irt: float = 500_000.0,
+        max_local_fall_pct: float = 0.8,
+        max_chase_pct: float = 1.2,
         movement_lookback_scans: int = 3,
         min_confirm_scans: int = 1,
-        min_observed_move_pct: float = 0.0,
-        max_local_24h_pct: float = 0.0,
-        min_global_24h_pct: float = -100.0,
-        min_volume_change_24h_pct: float = -100.0,
-        btc_max_dump_pct: float = 0.0,
-        max_local_premium_pct: float = 1.5,
+        min_observed_move_pct: float = 0.7,
+        max_local_24h_pct: float = 20.0,
+        min_global_24h_pct: float = -5.0,
+        min_volume_change_24h_pct: float = -30.0,
+        btc_max_dump_pct: float = 1.5,
         history_len: int = 48,
+        **_ignored: Any,
     ):
         self.global_pump_pct = float(global_pump_pct)
-        self.min_discount_pct = float(min_discount_pct)
-        self.max_discount_pct = float(max_discount_pct)
         self.max_spread_pct = float(max_spread_pct)
         self.min_global_volume_usd = float(min_global_volume_usd)
         self.max_global_quote_age_sec = float(max_global_quote_age_sec)
@@ -84,7 +74,6 @@ class GlobalLeadEngine:
         self.min_global_24h_pct = float(min_global_24h_pct)
         self.min_volume_change_24h_pct = float(min_volume_change_24h_pct)
         self.btc_max_dump_pct = float(btc_max_dump_pct)
-        self.max_local_premium_pct = float(max_local_premium_pct or 0.0)
         self.history_len = max(8, int(history_len or 48))
         self.last_stats: Dict[str, Any] = {}
 
@@ -100,8 +89,11 @@ class GlobalLeadEngine:
     def configure(self, **kwargs: Any) -> None:
         """Update filters without wiping observed-price history."""
         int_fields = {"movement_lookback_scans", "min_confirm_scans", "history_len"}
+        skip = {
+            "min_discount_pct", "max_discount_pct", "max_local_premium_pct",
+        }
         for key, value in kwargs.items():
-            if not hasattr(self, key) or value is None:
+            if key in skip or not hasattr(self, key) or value is None:
                 continue
             if key in int_fields:
                 setattr(self, key, max(1, int(value)))
@@ -112,26 +104,22 @@ class GlobalLeadEngine:
             self._irt_history.default_factory = self._new_history
 
     def observed_lead_threshold(self) -> float:
-        """Live observed move needed across lookback scans.
-
-        This is intentionally below the CMC 1h pump gate. Requiring the full
-        1h threshold over 4–6 scans made the observed path almost unreachable.
-        """
+        """Live observed USD move needed across lookback scans."""
         if self.min_observed_move_pct > 0:
-            return max(0.6, float(self.min_observed_move_pct))
-        return max(0.75, float(self.global_pump_pct) * 0.35)
+            return max(0.5, float(self.min_observed_move_pct))
+        return max(0.6, float(self.global_pump_pct) * 0.5)
 
     def stats_line(self) -> str:
         s = self.last_stats or {}
         return (
             "local={local} cmc={matched} no_cmc={no_cmc} spread={spread} "
-            "vol={volume} stale={stale} no_lead={no_lead} premium={premium} "
-            "passed={passed} btc_dump={btc_dump} median_disc={median_discount} "
-            "best_1h={best_1h} usdt_irt={usdt_irt}"
+            "vol={volume} stale={stale} no_lead={no_lead} falling={falling} "
+            "local_ahead={local_ahead} passed={passed} btc_dump={btc_dump} "
+            "best_1h={best_1h} best_obs={best_obs}"
         ).format(**{k: s.get(k, 0) for k in (
             "local", "matched", "no_cmc", "spread", "volume", "stale",
-            "no_lead", "premium", "passed", "btc_dump", "median_discount",
-            "best_1h", "usdt_irt",
+            "no_lead", "falling", "local_ahead", "passed", "btc_dump",
+            "best_1h", "best_obs",
         )})
 
     @staticmethod
@@ -242,7 +230,6 @@ class GlobalLeadEngine:
         *,
         global_1h: float,
         observed_global: Optional[float],
-        discount: float,
         spread: float,
         volume_usd: float,
         volume_change: float,
@@ -251,41 +238,40 @@ class GlobalLeadEngine:
     ) -> float:
         live_move = observed_global if observed_global is not None else global_1h
         score = (
-            min(max(live_move, 0.0), 15.0) * 12.0
-            + min(max(global_1h, 0.0), 15.0) * 4.0
-            + min(discount, 10.0) * 10.0
+            min(max(live_move, 0.0), 15.0) * 14.0
+            + min(max(global_1h, 0.0), 15.0) * 5.0
             + min(volume_usd / max(self.min_global_volume_usd, 1.0), 20.0)
             + min(max(volume_change, 0.0), 40.0) * 0.15
-            + min(max(local_tick, 0.0), 2.0) * 8.0
-            + min(lag_seconds / 60.0, 10.0) * 0.6
-            - spread * 8.0
+            + min(max(local_tick, 0.0), 2.0) * 4.0
+            + min(lag_seconds / 60.0, 10.0) * 0.4
+            - spread * 6.0
         )
         if observed_global is not None and observed_global < 0:
             score -= 25.0
         return score
 
+    def _reset_hit(self, symbol: str) -> None:
+        self._gap_hits.pop(symbol, None)
+        self._gap_first_seen.pop(symbol, None)
+
     def evaluate(
         self,
         local_rows: List[Dict[str, Any]],
         global_payload: Any,
-        usdt_irt: float,
+        usdt_irt: float = 0.0,
         *,
         now: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         now = time.time() if now is None else float(now)
         stats: Dict[str, Any] = {
             "local": 0, "matched": 0, "no_cmc": 0, "no_ask": 0, "volume": 0,
-            "spread": 0, "stale": 0, "no_lead": 0, "falling": 0, "premium": 0,
-            "too_cheap": 0, "local_fall": 0, "local_ahead": 0, "chase": 0,
+            "spread": 0, "stale": 0, "no_lead": 0, "falling": 0,
+            "local_fall": 0, "local_ahead": 0, "chase": 0,
             "btc_dump": 0, "local_24h": 0, "global_24h": 0, "vol_chg": 0,
             "confirm": 0, "passed": 0, "btc_dumping": False,
-            "median_discount": 0.0, "best_1h": 0.0, "usdt_irt": 0.0,
+            "best_1h": 0.0, "best_obs": 0.0,
         }
         fx = float(usdt_irt or 0.0)
-        stats["usdt_irt"] = round(fx, 2)
-        if fx <= 0:
-            self.last_stats = stats
-            return []
         global_map = self.build_global_map(global_payload, now=now)
         lookback = self.movement_lookback_scans
         obs_need = self.observed_lead_threshold()
@@ -293,8 +279,8 @@ class GlobalLeadEngine:
         stats["btc_dumping"] = btc_dumping
         live_symbols = []
         candidates: List[Dict[str, Any]] = []
-        discounts: List[float] = []
         best_1h = 0.0
+        best_obs = 0.0
 
         for local in local_rows or []:
             symbol = str(local.get("Symbol") or "").upper().strip()
@@ -319,6 +305,8 @@ class GlobalLeadEngine:
 
             stats["matched"] += 1
             best_1h = max(best_1h, float(g["Global1hPct"] or 0.0))
+            if observed_global is not None:
+                best_obs = max(best_obs, float(observed_global))
 
             if ask <= 0:
                 stats["no_ask"] += 1
@@ -358,61 +346,27 @@ class GlobalLeadEngine:
             strong_observed = observed_global is not None and observed_global >= obs_need
             if not (cmc_lead or strong_observed):
                 stats["no_lead"] += 1
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
+                self._reset_hit(symbol)
                 continue
 
-            # Trust prices we actually stored: a falling CMC path invalidates a green 1h print.
             if observed_global is not None and observed_global < -0.15:
                 stats["falling"] += 1
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
-                continue
-
-            fair_irt = g["GlobalPriceUSD"] * fx
-            if fair_irt <= 0:
-                continue
-            discount = (fair_irt - ask) / fair_irt * 100.0
-            discounts.append(discount)
-            velocity_lag = (
-                observed_global is not None
-                and observed_local is not None
-                and observed_global >= obs_need
-                and observed_local < observed_global - 0.15
-            )
-            price_discount_ok = discount >= self.min_discount_pct
-            premium_lag_ok = (
-                self.max_local_premium_pct > 0
-                and discount >= -abs(self.max_local_premium_pct)
-                and velocity_lag
-            )
-            if discount > self.max_discount_pct:
-                stats["too_cheap"] += 1
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
-                continue
-            if not (price_discount_ok or premium_lag_ok):
-                stats["premium"] += 1
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
+                self._reset_hit(symbol)
                 continue
 
             local_tick = safe_float(local.get("Nobitex 30s Change (%)")) or 0.0
             if local_tick < -self.max_local_fall_pct:
                 stats["local_fall"] += 1
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
+                self._reset_hit(symbol)
                 continue
 
-            # Local already ran ahead of the global move we measured — lag is gone.
             if (
                 observed_global is not None
                 and observed_local is not None
                 and observed_local > observed_global + 0.35
             ):
                 stats["local_ahead"] += 1
-                self._gap_hits.pop(symbol, None)
-                self._gap_first_seen.pop(symbol, None)
+                self._reset_hit(symbol)
                 continue
 
             chase_pct = self._chase_pct(ask, last)
@@ -426,17 +380,16 @@ class GlobalLeadEngine:
             if first is None:
                 self._gap_first_seen[symbol] = now
                 first = now
-            self._last_gap[symbol] = discount
+            live_move = observed_global if observed_global is not None else g["Global1hPct"]
+            self._last_gap[symbol] = live_move
             if hits < self.min_confirm_scans:
                 stats["confirm"] += 1
                 continue
 
             lag_seconds = max(0.0, now - first)
-            live_move = observed_global if observed_global is not None else g["Global1hPct"]
             score = self._score(
                 global_1h=g["Global1hPct"],
                 observed_global=observed_global,
-                discount=discount,
                 spread=spread,
                 volume_usd=g["GlobalVolumeUSD"],
                 volume_change=g["GlobalVolumeChange24hPct"],
@@ -444,6 +397,7 @@ class GlobalLeadEngine:
                 lag_seconds=lag_seconds,
             )
             stats["passed"] += 1
+            fair_irt = (g["GlobalPriceUSD"] * fx) if fx > 0 else 0.0
             candidates.append({
                 **local,
                 **g,
@@ -452,7 +406,6 @@ class GlobalLeadEngine:
                 "Nobitex Ask": ask,
                 "Nobitex Bid": bid,
                 "Nobitex Spread (%)": spread,
-                "Nobitex Discount (%)": discount,
                 "Lag Duration (sec)": lag_seconds,
                 "ObservedGlobalMove (%)": observed_global if observed_global is not None else 0.0,
                 "ObservedLocalMove (%)": observed_local if observed_local is not None else 0.0,
@@ -460,21 +413,14 @@ class GlobalLeadEngine:
                 "GapConfirmScans": hits,
                 "GlobalLeadScore": score,
                 "pump_pct": live_move,
-                "Signal": (
-                    f"GLOBAL LEAD +{g['Global1hPct']:.2f}% "
-                    f"/ OBS {0.0 if observed_global is None else observed_global:.2f}% "
-                    f"/ LAG {discount:.2f}%"
-                ),
+                "Signal": f"Global Lead Buy {live_move:+.2f}%",
                 "DataSource": "CoinMarketCap + Nobitex",
                 "ExecutionVenue": "Nobitex",
             })
 
         self._prune_gaps(live_symbols)
         candidates.sort(key=lambda x: float(x.get("GlobalLeadScore", 0.0)), reverse=True)
-        discounts.sort()
         stats["best_1h"] = round(best_1h, 2)
-        if discounts:
-            mid = discounts[len(discounts) // 2]
-            stats["median_discount"] = round(mid, 2)
+        stats["best_obs"] = round(best_obs, 2)
         self.last_stats = stats
         return candidates

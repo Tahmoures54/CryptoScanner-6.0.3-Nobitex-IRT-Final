@@ -870,10 +870,8 @@ class SignalTracker:
     # SIZING
     # ══════════════════════════════════════════════════════════════
     def _quote_multiplier(self) -> float:
-        """Convert user-facing Toman amounts to Nobitex RLS amounts."""
-        return 10.0 if str(getattr(self, "quote_currency", "IRT") or "IRT").upper() in (
-            "IRT", "RLS", "IRR",
-        ) else 1.0
+        """Position sizes are already in exchange quote units (Rial for IRT)."""
+        return 1.0
 
     def _position_size_for(self, entry_price: float, sl_pct: float) -> float:
         if entry_price <= 0:
@@ -898,8 +896,8 @@ class SignalTracker:
             notional_rls = min(notional_rls, max_notional_rls)
         if min_notional_rls > 0 and notional_rls < min_notional_rls:
             logger.info(
-                "Skip sizing: available position %.2f Toman is below configured minimum %.2f Toman",
-                notional_rls / multiplier, min_notional_rls / multiplier,
+                "Skip sizing: available position %.2f %s is below configured minimum %.2f %s",
+                notional_rls, self.quote_currency, min_notional_rls, self.quote_currency,
             )
             return 0.0
         if notional_rls < 10.0:
@@ -1595,7 +1593,6 @@ class SignalTracker:
         for key in (
             "pump_percentage", "Pump Percentage", "pump_pct", "Pump_Pct",
             "LiveLeadMove (%)", "ObservedGlobalMove (%)", "Global1hPct",
-            "Nobitex Discount (%)",
             "Change", "1h Change (%)", "change_1h", "percent_change_1h",
             "price_change_percentage_1h", "price_change_pct",
         ):

@@ -1,18 +1,15 @@
-"""IRT/Rial display helpers. 1 Toman = 10 Rial."""
-
-_TOMAN_PER_RIAL = 0.1
+"""IRT/Rial display helpers. Nobitex IRT balances are Rial."""
 
 
-def quote_uses_toman(quote: str) -> bool:
+def is_irt_quote(quote: str) -> bool:
     return str(quote or "").upper() in {"IRT", "RLS", "IRR"}
 
 
-def rial_to_toman(value: float) -> float:
-    return float(value) * _TOMAN_PER_RIAL
-
-
-def toman_to_rial(value: float) -> float:
-    return float(value) / _TOMAN_PER_RIAL
+def display_quote_label(quote: str) -> str:
+    if is_irt_quote(quote):
+        return "IRT (Rial)"
+    text = str(quote or "USDT").strip().upper()
+    return text or "USDT"
 
 
 def parse_amount(text: str, default: float = 0.0) -> float:

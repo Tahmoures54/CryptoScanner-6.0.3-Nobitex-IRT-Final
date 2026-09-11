@@ -34,15 +34,19 @@ At each scan CryptoScanner stores the actual CMC USD price observed for an asset
 
 Recommended initial settings for a live account:
 
-- Movement Threshold: 2.5% or higher (CMC 1h or observed lookback)
-- Lookback: 6 scans (~90s at the 15s default interval)
+- CMC 1h move: 1.2% (or observed lookback move 0.7%)
+- Lookback: 3 scans
 - Scan interval: 15 seconds
+- Max Nobitex spread: 2.5%
 - Max open positions: 1–3
 - Max total exposure: 50% or lower
 - Max position: 25% or lower
 - Stop Loss: 3%
 - Trailing Distance: 1.5%
 - Auto Trading: **OFF until connection diagnostics pass**
+- IRT amounts are Rial (same as the Nobitex wallet)
+
+Entry is coin movement, not a Nobitex vs CMC price-gap.
 
 These are software defaults, not financial recommendations.
 

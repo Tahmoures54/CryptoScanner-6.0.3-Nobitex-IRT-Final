@@ -24,20 +24,21 @@ WHAT CHANGED
 DEFAULT REAL SETTINGS
 ---------------------
 Exchange: Nobitex
-Quote: IRT
+Quote: IRT (Rial, same as Nobitex wallets)
 Spot: Yes
 Auto trading: enabled when the configured Nobitex executor is READY
 Max open positions: 3
 Max exposure: 50% of current equity
-Position target: 750,000 Toman (stored as Rial internally)
-Minimum order: 300,000 Toman
+Position target: 750,000 IRT (Rial)
+Minimum order: 300,000 IRT (Rial)
 Initial stop: 3%
 Trailing activation: 1.5%
 Trailing distance: 1.5%
 Scan interval: 15 seconds
-Lookback: 6 scans
+Lookback: 3 scans
 New entries per cycle: 1
 Confirmation: enabled (wait for a small local catch-up tick)
+Entry rule: coin movement on CMC (1h or observed), not Nobitex vs CMC price gap
 
 IMPORTANT
 ---------

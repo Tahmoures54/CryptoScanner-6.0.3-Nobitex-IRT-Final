@@ -315,43 +315,34 @@ class CryptoScannerApp:
             st.auto_trading_enabled = was
 
     def _configure_global_lead_engine(self, cfg) -> None:
-        raw_spread = float(getattr(cfg, "max_nobitex_spread_pct", 2.0) or 2.0)
-        raw_discount = float(getattr(cfg, "min_nobitex_discount_pct", 0.4) or 0.0)
-        raw_age = float(getattr(cfg, "max_global_quote_age_sec", 240.0) or 240.0)
-        # IRT books are wider and often sit at a small premium to CMC*USDT.
-        spread = max(raw_spread, 2.0)
-        discount = min(raw_discount, 0.5) if raw_discount > 0 else raw_discount
-        age = max(raw_age, 180.0)
+        raw_spread = float(getattr(cfg, "max_nobitex_spread_pct", 2.5) or 2.5)
+        raw_age = float(getattr(cfg, "max_global_quote_age_sec", 300.0) or 300.0)
         kwargs = dict(
-            global_pump_pct=float(getattr(cfg, "global_pump_threshold_pct", 1.8)),
-            min_discount_pct=discount,
-            max_discount_pct=float(getattr(cfg, "max_nobitex_discount_pct", 18.0)),
-            max_spread_pct=spread,
-            min_global_volume_usd=float(getattr(cfg, "min_global_volume_usd", 300000.0)),
-            max_global_quote_age_sec=age,
-            min_local_volume_irt=float(getattr(cfg, "min_volume_24h", 1000000.0)),
-            max_local_fall_pct=float(getattr(cfg, "max_local_fall_pct", 0.5)),
-            max_chase_pct=float(getattr(cfg, "max_chase_pct", 1.0)),
-            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 4) or 4),
+            global_pump_pct=float(getattr(cfg, "global_pump_threshold_pct", 1.2)),
+            max_spread_pct=max(raw_spread, 2.0),
+            min_global_volume_usd=float(getattr(cfg, "min_global_volume_usd", 250000.0)),
+            max_global_quote_age_sec=max(raw_age, 180.0),
+            min_local_volume_irt=float(getattr(cfg, "min_volume_24h", 500000.0)),
+            max_local_fall_pct=float(getattr(cfg, "max_local_fall_pct", 0.8)),
+            max_chase_pct=float(getattr(cfg, "max_chase_pct", 1.2)),
+            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 3) or 3),
             min_confirm_scans=int(getattr(cfg, "min_confirm_scans", 1) or 1),
-            min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 0.6)),
-            max_local_24h_pct=float(getattr(cfg, "max_local_24h_pct", 16.0)),
-            min_global_24h_pct=float(getattr(cfg, "min_global_24h_pct", -4.0)),
-            min_volume_change_24h_pct=float(getattr(cfg, "min_volume_change_24h_pct", -20.0)),
+            min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 0.7)),
+            max_local_24h_pct=float(getattr(cfg, "max_local_24h_pct", 20.0)),
+            min_global_24h_pct=float(getattr(cfg, "min_global_24h_pct", -5.0)),
+            min_volume_change_24h_pct=float(getattr(cfg, "min_volume_change_24h_pct", -30.0)),
             btc_max_dump_pct=float(getattr(cfg, "btc_max_dump_pct", 1.5)),
-            max_local_premium_pct=float(getattr(cfg, "max_local_premium_pct", 1.5) or 0.0),
         )
         if self.global_lead_engine is None:
             self.global_lead_engine = GlobalLeadEngine(**kwargs)
         else:
             self.global_lead_engine.configure(**kwargs)
         logger.info(
-            "[REAL][GLOBAL] Engine filters | pump=%.2f obs=%.2f disc=%.2f spread=%.2f "
-            "premium=%.2f lookback=%d age=%.0fs",
+            "[REAL][GLOBAL] Engine filters | pump=%.2f obs=%.2f spread=%.2f "
+            "lookback=%d age=%.0fs vol=$%.0f",
             kwargs["global_pump_pct"], kwargs["min_observed_move_pct"],
-            kwargs["min_discount_pct"], kwargs["max_spread_pct"],
-            kwargs["max_local_premium_pct"], kwargs["movement_lookback_scans"],
-            kwargs["max_global_quote_age_sec"],
+            kwargs["max_spread_pct"], kwargs["movement_lookback_scans"],
+            kwargs["max_global_quote_age_sec"], kwargs["min_global_volume_usd"],
         )
 
     def _real_scan_interval_ms(self) -> int:
@@ -527,18 +518,19 @@ class CryptoScannerApp:
                 try:
                     local_symbols = [str(r.get("Symbol") or "").upper() for r in live_rows]
                     global_payload = self._fetch_cmc_global_payload(local_symbols)
-                    usdt_irt = GlobalLeadEngine.usdt_irt_from_rows(live_rows)
-                    if not usdt_irt and self.trading_bot:
-                        usdt_irt = self.trading_bot.get_usdt_irt_rate(live_rows)
-                    if not usdt_irt:
-                        logger.warning("[REAL][NOBITEX] USDT/IRT rate unavailable; no global-lead entries this cycle.")
-                    elif self.global_lead_engine is None:
+                    if self.global_lead_engine is None:
                         logger.warning("[REAL][GLOBAL] Lead engine missing; no new real entries this cycle.")
                     elif not global_payload:
                         logger.warning("[REAL][GLOBAL] CoinMarketCap payload empty; no new real entries this cycle.")
                     else:
+                        usdt_irt = GlobalLeadEngine.usdt_irt_from_rows(live_rows)
+                        if not usdt_irt and self.trading_bot:
+                            try:
+                                usdt_irt = self.trading_bot.get_usdt_irt_rate(live_rows)
+                            except Exception:
+                                usdt_irt = 0.0
                         candidates = self.global_lead_engine.evaluate(
-                            live_rows, global_payload, usdt_irt, now=now
+                            live_rows, global_payload, usdt_irt or 0.0, now=now
                         )
                         logger.info(
                             "[REAL][GLOBAL] Filters | %s",
@@ -563,15 +555,13 @@ class CryptoScannerApp:
                 if hit:
                     self._apply_global_lead_hit(row, hit)
                     logger.info(
-                        "[REAL][GLOBAL→NOBITEX] %s | cmc1h=%.2f%% | obs=%.2f%% | fair=%s IRT | ask=%s IRT | discount=%.2f%% | spread=%.2f%% | lag=%ds | score=%.1f | signal=%s",
+                        "[REAL][GLOBAL→NOBITEX] %s | cmc1h=%.2f%% | obs=%.2f%% | ask=%s IRT | spread=%.2f%% | local_obs=%.2f%% | score=%.1f | signal=%s",
                         row.get("Symbol"),
                         float(hit.get("Global1hPct", 0)),
                         float(hit.get("ObservedGlobalMove (%)", 0)),
-                        f"{float(hit.get('Fair IRT Price', 0)):.8f}",
                         f"{float(hit.get('Nobitex Ask', 0) or hit.get('Ask') or row.get('Price') or 0):.8f}",
-                        float(hit.get("Nobitex Discount (%)", 0)),
                         float(hit.get("Nobitex Spread (%)", 0)),
-                        int(float(hit.get("Lag Duration (sec)", 0))),
+                        float(hit.get("ObservedLocalMove (%)", 0)),
                         float(hit.get("GlobalLeadScore", 0)),
                         row.get("Signal"),
                     )

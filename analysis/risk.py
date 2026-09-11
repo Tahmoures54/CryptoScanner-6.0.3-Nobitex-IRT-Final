@@ -696,15 +696,15 @@ _global_cache = RiskCache()
 class RiskExplainer:
     _LEVEL_EMOJI = {"Extreme": "🚨", "High": "🔴", "Medium": "🟡", "Low": "🟢", "Unknown": "⚪"}
     _ENGINE_MESSAGES: Dict[str, List[Tuple[float, str]]] = {
-        "Volatility_Risk": [(8.5, "نوسان بسیار شدید — ریسک بالای stop-loss trigger"), (7.0, "نوسان بالا — مدیریت سایز ضروری است")],
-        "Liquidity_Risk": [(7.5, "نقدشوندگی ضعیف — خطر slippage در خروج"), (6.5, "نقدشوندگی زیر میانگین")],
-        "Market_Risk": [(7.5, "بازار کوچک — حساس به whale manipulation"), (6.0, "cap بازار محدود")],
-        "Trend_Risk": [(7.0, "روند ناپایدار یا کشیده")],
-        "Technical_Risk": [(7.0, "شاخص‌های تکنیکال در منطقه افراطی")],
-        "Volume_Risk": [(7.0, "حجم غیرعادی — احتمال manipulation یا خبر")],
-        "Derivatives_Risk": [(7.5, "funding/long-short در تعادل نیست")],
-        "Orderbook_Risk": [(7.0, "عدم تعادل order book — احتمال حرکت ناگهانی")],
-        "Onchain_Risk": [(7.0, "سیگنال‌های on-chain هشداردهنده")],
+        "Volatility_Risk": [(8.5, "Very high volatility — stop-loss may trigger easily"), (7.0, "High volatility — size down")],
+        "Liquidity_Risk": [(7.5, "Weak liquidity — exit slippage risk"), (6.5, "Liquidity below average")],
+        "Market_Risk": [(7.5, "Small market — sensitive to whale flow"), (6.0, "Limited market cap")],
+        "Trend_Risk": [(7.0, "Unstable or extended trend")],
+        "Technical_Risk": [(7.0, "Technical indicators in an extreme zone")],
+        "Volume_Risk": [(7.0, "Unusual volume — possible news or manipulation")],
+        "Derivatives_Risk": [(7.5, "Funding / long-short is unbalanced")],
+        "Orderbook_Risk": [(7.0, "Order-book imbalance — sudden move risk")],
+        "Onchain_Risk": [(7.0, "On-chain signals are cautionary")],
     }
 
     def explain(self, result: Dict[str, Any], symbol: str = "", verbose: bool = False) -> str:
@@ -714,19 +714,19 @@ class RiskExplainer:
         dd = result.get("Expected_Drawdown", 0.0)
         dq = result.get("DataQuality", 0.0)
 
-        header = f"{emoji} **{symbol + ' — ' if symbol else ''}ریسک {level}**"
-        meta = f"Score: {score:.1f}/10 | Max Drawdown تخمینی: {dd:.1f}% | کیفیت داده: {dq:.0f}%"
+        header = f"{emoji} **{symbol + ' — ' if symbol else ''}Risk {level}**"
+        meta = f"Score: {score:.1f}/10 | Est. max drawdown: {dd:.1f}% | Data quality: {dq:.0f}%"
         reasons = self._get_reasons(result)
-        reasons_text = "\n".join(f"  • {r}" for r in reasons) if reasons else "  • شرایط نرمال بازار"
+        reasons_text = "\n".join(f"  • {r}" for r in reasons) if reasons else "  • Normal market conditions"
 
-        parts = [header, meta, "دلایل:\n" + reasons_text]
+        parts = [header, meta, "Reasons:\n" + reasons_text]
 
         if verbose:
             engine_lines = [f"  {eng}: {float(result.get(eng, 5.0)):.1f}/10" for eng in self._ENGINE_MESSAGES.keys()]
             if engine_lines:
-                parts.append("جزئیات Engine‌ها:\n" + "\n".join(engine_lines))
+                parts.append("Engine details:\n" + "\n".join(engine_lines))
             bear = result.get("Bear_Factor", 0.5)
-            parts.append(f"Bear Factor: {bear:.0%} | رژیم: {'Risk-Off' if bear > 0.6 else 'Normal'}")
+            parts.append(f"Bear Factor: {bear:.0%} | Regime: {'Risk-Off' if bear > 0.6 else 'Normal'}")
 
         return "\n".join(parts)
 
@@ -744,11 +744,11 @@ class RiskExplainer:
 
         bear_f = float(result.get("Bear_Factor", 0.5))
         if bear_f > 0.70:
-            reasons.append(f"رژیم ریسک‌گریز (Fear {bear_f:.0%})")
+            reasons.append(f"Risk-off regime (Fear {bear_f:.0%})")
 
         dq = float(result.get("DataQuality", 100.0))
         if dq < 40:
-            reasons.append(f"کیفیت داده پایین ({dq:.0f}%) — نتیجه با احتیاط تفسیر شود")
+            reasons.append(f"Low data quality ({dq:.0f}%) — treat the result with caution")
 
         return reasons
 

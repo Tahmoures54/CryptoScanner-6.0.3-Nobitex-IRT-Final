@@ -100,9 +100,9 @@ class SettingsWindow(BaseDialog):
         self._api_source_cb.grid(row=0, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
         self._api_source_cb.bind("<<ComboboxSelected>>", self._on_source_change)
         ToolTip(self._api_source_cb,
-                "CoinGecko: رایگان، بدون کلید\n"
-                "CoinMarketCap: نیاز به API Key\n"
-                "Binance: دسترسی به کندل‌ها (بدون کلید)")
+                "CoinGecko: free, no key required\n"
+                "CoinMarketCap: requires an API key\n"
+                "Binance: public candles, no key required")
 
         tk.Label(grid, text="CoinGecko Key:", font=T.font(size=T.FONT_SM),
                  bg=T.BG_PANEL, fg=T.TEXT_SECONDARY).grid(
@@ -148,8 +148,8 @@ class SettingsWindow(BaseDialog):
         tk.Label(
             frame.body,
             text=(
-                "اندازه معامله، حد ضرر، اسکن زنده و استراتژی Global Lead "
-                "اینجا نیست — مال ربات است."
+                "Trade size, stops, live scan, and Global Lead live in the bot.\n"
+                "Open SmartEagle Bot → Settings."
             ),
             font=T.font(size=T.FONT_SM),
             bg=T.BG_PANEL,
@@ -174,9 +174,9 @@ class SettingsWindow(BaseDialog):
         frame.pack(fill="x", pady=(0, T.PAD_MD))
         checkboxes = [
             ("🔄 Auto Refresh", self.app.auto_refresh_var,
-             "بارگذاری خودکار داده‌ها هر ۵ دقیقه"),
+             "Reload market data every 5 minutes"),
             ("🎯 Simple Mode by Default", self.app.simple_mode_var,
-             "نمایش ستون‌های کمتر"),
+             "Show fewer table columns"),
         ]
         for text, var, tip in checkboxes:
             row = tk.Frame(frame.body, bg=T.BG_PANEL)

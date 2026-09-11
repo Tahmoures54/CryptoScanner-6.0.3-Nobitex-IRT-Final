@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from api.api_coinmarketcap import extract_usd_quote
-from core.irt_money import parse_amount, quote_uses_toman, rial_to_toman, toman_to_rial
+from core.irt_money import display_quote_label, is_irt_quote, parse_amount
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,14 +23,14 @@ def test_scanner_settings_do_not_host_bot_trading_form():
     assert "SmartEagle Bot" in src
 
 
-def test_bot_settings_host_global_lead_and_irt_sizing():
+def test_bot_settings_host_global_lead_and_rial_sizing():
     src = (_ROOT / "gui/panels/real_trading_panel.py").read_text(encoding="utf-8")
     assert "def _build_strategy_section" in src
     assert "global_pump_threshold_pct" in src
-    assert "min_nobitex_discount_pct" in src
-    assert "_configure_global_lead_engine" in src
-    assert "تومان" in src
-    assert "position_size_mode" in src
+    assert "min_nobitex_discount_pct" not in src
+    assert "max_local_premium_pct" not in src
+    assert "IRT (Rial)" in src
+    assert "تومان" not in src
     app_src = (_ROOT / "gui/gui_main.py").read_text(encoding="utf-8")
     assert "def open_bot_settings" in app_src
     payload = {
@@ -42,10 +42,9 @@ def test_bot_settings_host_global_lead_and_irt_sizing():
     assert usd["market_cap_change_24h"] == 1.25
 
 
-def test_irt_amounts_convert_toman_to_rial():
-    assert quote_uses_toman("IRT")
-    assert quote_uses_toman("RLS")
-    assert not quote_uses_toman("USDT")
-    assert rial_to_toman(750_000) == 75_000
-    assert toman_to_rial(75_000) == 750_000
-    assert parse_amount("75,000") == 75_000
+def test_irt_amounts_display_as_rial():
+    assert is_irt_quote("IRT")
+    assert is_irt_quote("RLS")
+    assert not is_irt_quote("USDT")
+    assert display_quote_label("IRT") == "IRT (Rial)"
+    assert parse_amount("38,183,865") == 38183865

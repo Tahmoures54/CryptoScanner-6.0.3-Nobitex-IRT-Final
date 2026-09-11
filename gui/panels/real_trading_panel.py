@@ -40,7 +40,7 @@ from gui.trading_ui_helpers import (
 from trading.bot_config import BotConfig, load_config, save_config
 from signal_tracker import SignalTracker
 from trading.trader import TradingBot
-from core.irt_money import parse_amount, quote_uses_toman, rial_to_toman, toman_to_rial
+from core.irt_money import display_quote_label, parse_amount
 
 if TYPE_CHECKING:
     from gui.gui_main import CryptoScannerApp
@@ -319,7 +319,7 @@ class RealTradingPanel(tk.Frame):
             self.tracker._save_state()
             if quote in ("IRT", "RLS", "IRR"):
                 self.log(
-                    f"Tracker balance synced to {cash / 10.0:,.2f} Toman ({cash:,.2f} RLS)",
+                    f"Tracker balance synced to {cash:,.2f} IRT (Rial)",
                     "info",
                 )
             else:
@@ -773,7 +773,7 @@ class RealTradingPanel(tk.Frame):
             if balance is None:
                 balance = 0.0
             quote = str(getattr(self.config, "quote_currency", "IRT") or "IRT")
-            self._balance_label.config(text=f"Balance: {balance:,.2f} {quote}")
+            self._balance_label.config(text=f"Balance: {balance:,.2f} {display_quote_label(quote)}")
         except Exception as e:
             logger.error("Failed to update balance display: %s", e)
 
@@ -904,7 +904,7 @@ class RealTradingPanel(tk.Frame):
             pos_count = status.get("open_trades", 0) or 0
             max_pos = getattr(self.config, "max_open_positions", 5)
             win_rate = status.get("win_rate_pct", 0) or 0.0
-            quote = getattr(self.config, "quote_currency", "IRT")
+            quote = display_quote_label(getattr(self.config, "quote_currency", "IRT"))
             self._metric_labels["Balance"].config(text=f"{equity:.2f} {quote}")
             pnl_color = T.SUCCESS_DARK if open_pnl >= 0 else T.DANGER_DARK
             self._metric_labels["Open P&L"].config(
@@ -1347,35 +1347,26 @@ class BotSettingsWindow(BaseDialog):
         self._build_risk_section(self.scrollable_frame)
         self._build_extra_section(self.scrollable_frame)
 
-    def _uses_toman(self) -> bool:
+    def _quote_label(self) -> str:
         quote = ""
         if hasattr(self, "_quote_currency_var"):
             quote = str(self._quote_currency_var.get() or "")
         if not quote:
             quote = str(getattr(self.config, "quote_currency", "IRT") or "IRT")
-        return quote_uses_toman(quote)
+        return display_quote_label(quote)
 
-    def _money_unit(self) -> str:
-        return "تومان" if self._uses_toman() else str(
-            getattr(self.config, "quote_currency", "USDT") or "USDT"
-        )
+    def _money_to_display(self, value: float) -> str:
+        amount = float(value or 0.0)
+        if abs(amount) >= 100:
+            return f"{amount:,.0f}"
+        return f"{amount:.4f}".rstrip("0").rstrip(".")
 
-    def _money_to_display(self, rial: float) -> str:
-        value = rial_to_toman(rial) if self._uses_toman() else float(rial)
-        if self._uses_toman() or value >= 100:
-            return f"{value:,.0f}"
-        return f"{value:.4f}".rstrip("0").rstrip(".")
-
-    def _money_from_display(self, text: str, default_rial: float) -> float:
-        displayed = parse_amount(
-            text,
-            rial_to_toman(default_rial) if self._uses_toman() else default_rial,
-        )
-        return toman_to_rial(displayed) if self._uses_toman() else displayed
+    def _money_from_display(self, text: str, default: float) -> float:
+        return parse_amount(text, default)
 
     def _build_strategy_section(self, parent) -> None:
         sf = tk.LabelFrame(
-            parent, text="🎯  Global Lead → Nobitex (استراتژی زنده)",
+            parent, text="🎯  Global Lead — coin movement",
             font=T.font(size=T.FONT_SM, weight="bold"),
             bg=T.BG_APP, fg=T.PRIMARY, padx=T.PAD_MD, pady=T.PAD_MD,
         )
@@ -1384,7 +1375,7 @@ class BotSettingsWindow(BaseDialog):
 
         tk.Label(
             sf,
-            text="این فیلدها مال ربات‌اند، نه اسکنر بازار.",
+            text="Entries follow CMC / observed move. Nobitex vs CMC price gap is not used.",
             font=T.font(size=T.FONT_XS),
             bg=T.BG_APP, fg=T.TEXT_MUTED,
         ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, T.PAD_SM))
@@ -1392,19 +1383,17 @@ class BotSettingsWindow(BaseDialog):
         self._strategy_vars: Dict[str, tk.Variable] = {}
         row = 1
         float_fields = [
-            ("global_pump_threshold_pct", "آستانه رشد CMC / Lead (%)", 1.8),
-            ("min_observed_move_pct", "حداقل حرکت مشاهده‌شده CMC (%)", 0.6),
-            ("min_nobitex_discount_pct", "حداقل تخفیف نوبیتکس نسبت به CMC (%)", 0.4),
-            ("max_local_premium_pct", "حداکثر پریمیوم اگر بازار محلی عقب باشد (%)", 1.5),
-            ("max_nobitex_spread_pct", "حداکثر اسپرد نوبیتکس (%)", 2.2),
-            ("min_global_volume_usd", "حداقل حجم ۲۴س CMC (USD)", 300000.0),
-            ("max_global_quote_age_sec", "حداکثر عمر قیمت CMC (ثانیه)", 240.0),
-            ("btc_max_dump_pct", "رد آلت‌ها اگر BTC بیشتر از این بریزد (%)", 1.5),
+            ("global_pump_threshold_pct", "CMC 1h move threshold (%)", 1.2),
+            ("min_observed_move_pct", "Min observed CMC move (%)", 0.7),
+            ("max_nobitex_spread_pct", "Max Nobitex spread (%)", 2.5),
+            ("min_global_volume_usd", "Min CMC 24h volume (USD)", 250000.0),
+            ("max_global_quote_age_sec", "Max CMC quote age (sec)", 300.0),
+            ("btc_max_dump_pct", "Skip alts if BTC dumps more than (%)", 1.5),
         ]
         int_fields = [
-            ("check_interval_seconds", "فاصله اسکن زنده (ثانیه)", 15),
-            ("movement_lookback_scans", "تعداد اسکن مبنای حرکت", 4),
-            ("max_new_entries_per_cycle", "حداکثر ورود جدید در هر اسکن", 1),
+            ("check_interval_seconds", "Live scan interval (sec)", 15),
+            ("movement_lookback_scans", "Lookback scans for observed move", 3),
+            ("max_new_entries_per_cycle", "Max new entries per scan", 1),
         ]
         for key, label, default in float_fields:
             tk.Label(sf, text=label + ":", font=T.font(size=T.FONT_SM),
@@ -1486,7 +1475,7 @@ class BotSettingsWindow(BaseDialog):
         cf.columnconfigure(1, weight=1)
 
         tk.Label(
-            cf, text=f"موجودی حساب ({self._money_unit()}):", font=T.font(size=T.FONT_SM),
+            cf, text=f"Account balance ({self._quote_label()}):", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=0, column=0, sticky="w", pady=T.PAD_XS)
         self._account_balance_var = tk.StringVar(
@@ -1557,9 +1546,9 @@ class BotSettingsWindow(BaseDialog):
         ef.pack(fill="x", pady=(0, T.PAD_MD))
         ef.columnconfigure(1, weight=1)
 
-        unit = self._money_unit()
+        unit = self._quote_label()
         tk.Label(
-            ef, text="حالت اندازه معامله:", font=T.font(size=T.FONT_SM),
+            ef, text="Position size mode:", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=0, column=0, sticky="w", pady=T.PAD_XS)
         self._position_size_mode_var = tk.StringVar(
@@ -1571,7 +1560,7 @@ class BotSettingsWindow(BaseDialog):
         ).grid(row=0, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
 
         tk.Label(
-            ef, text=f"مبلغ ثابت هر معامله ({unit}):", font=T.font(size=T.FONT_SM),
+            ef, text=f"Fixed amount per trade ({unit}):", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=1, column=0, sticky="w", pady=T.PAD_XS)
         self._fixed_position_var = tk.StringVar(
@@ -1582,7 +1571,7 @@ class BotSettingsWindow(BaseDialog):
         )
 
         tk.Label(
-            ef, text=f"حداقل ارزش سفارش ({unit}):", font=T.font(size=T.FONT_SM),
+            ef, text=f"Min order value ({unit}):", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=2, column=0, sticky="w", pady=T.PAD_XS)
         self._min_notional_var = tk.StringVar(
@@ -1682,16 +1671,14 @@ class BotSettingsWindow(BaseDialog):
             self._nobitex_market_var.set("IRT")
         if hasattr(self, "_strategy_vars"):
             defaults = {
-                "global_pump_threshold_pct": 1.8,
-                "min_observed_move_pct": 0.6,
-                "min_nobitex_discount_pct": 0.4,
-                "max_local_premium_pct": 1.5,
-                "max_nobitex_spread_pct": 2.2,
-                "min_global_volume_usd": 300000.0,
-                "max_global_quote_age_sec": 240.0,
+                "global_pump_threshold_pct": 1.2,
+                "min_observed_move_pct": 0.7,
+                "max_nobitex_spread_pct": 2.5,
+                "min_global_volume_usd": 250000.0,
+                "max_global_quote_age_sec": 300.0,
                 "btc_max_dump_pct": 1.5,
                 "check_interval_seconds": 15,
-                "movement_lookback_scans": 4,
+                "movement_lookback_scans": 3,
                 "max_new_entries_per_cycle": 1,
             }
             for key, value in defaults.items():
@@ -1771,6 +1758,7 @@ class BotSettingsWindow(BaseDialog):
 
         self.config.strategy = "global_lead_local_lag"
         self.config.global_signal_source = "CoinMarketCap"
+        self.config.quote_unit = "rial"
         if hasattr(self, "_enable_auto_trading_var"):
             self.config.enable_auto_trading = bool(self._enable_auto_trading_var.get())
         int_keys = {"check_interval_seconds", "movement_lookback_scans", "max_new_entries_per_cycle"}
@@ -1810,7 +1798,7 @@ class BotSettingsWindow(BaseDialog):
             "Saved",
             "Bot configuration saved.\n"
             "Trading settings live here (Bot → Settings), not in the market scanner.\n"
-            "IRT amounts are entered in Toman and stored as Rial.\n"
+            "IRT amounts are Rial, same as Nobitex.\n"
             "Restart the bot to apply exchange key changes.",
             parent=self.panel,
         )

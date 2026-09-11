@@ -401,7 +401,7 @@ class CopyableLabel(tk.Frame):
             command=self._copy,
         )
         self._copy_btn.pack(side="left", padx=T.PAD_XS)
-        ToolTip(self._copy_btn, "کپی در کلیپ‌بورد")
+        ToolTip(self._copy_btn, "Copy to clipboard")
 
     def _display_text(self, text: str) -> str:
         """متن نمایشی (احتمالاً truncate‌شده)."""

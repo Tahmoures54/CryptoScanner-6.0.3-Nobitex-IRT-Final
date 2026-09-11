@@ -1,34 +1,25 @@
-CryptoScanner 6.1.0 — Real Trading Data Flow
+CryptoScanner — Real Trading Data Flow
 
-REAL AUTO TRADING — OBSERVED GLOBAL LEAD / NOBITEX LOCAL LAG
-1. Nobitex /market/stats (IRT/Rial markets) -> live local market universe and order-book liquidity.
-2. CoinMarketCap listings (cached; v1 quote.USD dict or v3 quote[] array) + quotes/latest for overlapping symbols -> actual USD prices this cycle.
-3. Engine stores CMC USD and Nobitex ask every scan and measures real lookback movement.
-4. Live Nobitex USDT/IRT ask (from the same market snapshot) -> USD-to-IRT fair-value conversion.
-5. GlobalLeadEngine keeps a candidate only when:
-   - CMC path we stored is still leading (or a live observed pump is underway)
-   - Nobitex Ask is still below fair IRT, or only a small premium while local price lagged the CMC move
-   - spread / volume / freshness / BTC-regime / local-lag filters pass
-6. Confirmed candidates go to the dedicated real SignalTracker and are shadowed on Paper Trading (simulated, no Nobitex order).
+REAL AUTO TRADING — OBSERVED COIN MOVEMENT
+1. Nobitex /market/stats (IRT/Rial markets) -> live local universe and books.
+2. CoinMarketCap listings + quotes for overlapping symbols -> USD prices this cycle.
+3. Engine stores CMC USD and Nobitex ask every scan and measures lookback movement.
+4. GlobalLeadEngine keeps a candidate when the coin is moving (CMC 1h or observed USD path)
+   and quality filters pass (spread, volume, freshness, BTC dump, local already done).
+5. It does not require Nobitex to be cheaper than CMC × USDT/IRT.
+6. Confirmed candidates go to the live SignalTracker and are shadowed on Paper Trading.
 7. Real SignalTracker -> TradingBot -> Nobitex order API.
-8. Actual fill confirmation -> native exchange-side stop_market -> trailing replacement -> exit.
+8. Fill confirmation -> native stop_market -> trailing -> exit.
 
 IMPORTANT
-- CoinMarketCap is market intelligence only; it never receives orders.
-- Nobitex remains the sole execution venue.
-- Generic public/paper pump signals are NOT allowed to enter the Global Lead real execution path.
-- The Real Trading panel's legacy auto-signal queue is disabled when the global_lead_local_lag strategy is active to prevent duplicate live execution paths.
-- Trading size, stops, scan interval, and Global Lead filters are edited in
-  SmartEagle Bot → ⚙️ Settings. Scanner Settings is market-data API / display only.
-
-PAPER / PUBLIC SCANNER
-- CoinGecko / CoinMarketCap / Binance/public scanner data remains informational for the main scanner.
-- It is not routed to the real executor.
-- Main-screen background paper auto-trading of public % Pump signals stays off.
-- Paper Trading shadows Global Lead candidates with simulated fills.
+- CoinMarketCap is intelligence only; it never receives orders.
+- Nobitex is the sole execution venue.
+- IRT balances and size are Rial, matching the Nobitex wallet.
+- Trading size, stops, and Global Lead live in SmartEagle Bot → Settings.
+- Scanner Settings is market-data API / display only.
 
 LOGGING
-- [REAL][GLOBAL→NOBITEX] = global intelligence + local execution candidate
+- [REAL][GLOBAL→NOBITEX] = movement candidate
 - [REAL][NOBITEX] = live execution / monitoring
 - [PAPER] = paper workflow
-- [REAL][SAFETY] = protective-stop/emergency-exit event
+- [REAL][SAFETY] = protective-stop / emergency-exit
