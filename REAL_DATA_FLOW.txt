@@ -18,7 +18,8 @@ IMPORTANT
 - Nobitex remains the sole execution venue.
 - Generic public/paper pump signals are NOT allowed to enter the Global Lead real execution path.
 - The Real Trading panel's legacy auto-signal queue is disabled when the global_lead_local_lag strategy is active to prevent duplicate live execution paths.
-- A stale CMC 1h % print is not enough: if the USD price we stored is already falling, there is no new live entry.
+- Trading size, stops, scan interval, and Global Lead filters are edited in
+  SmartEagle Bot → ⚙️ Settings. Scanner Settings is market-data API / display only.
 
 PAPER / PUBLIC SCANNER
 - CoinGecko / CoinMarketCap / Binance/public scanner data remains informational for the main scanner.

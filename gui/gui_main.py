@@ -345,6 +345,14 @@ class CryptoScannerApp:
             self.global_lead_engine = GlobalLeadEngine(**kwargs)
         else:
             self.global_lead_engine.configure(**kwargs)
+        logger.info(
+            "[REAL][GLOBAL] Engine filters | pump=%.2f obs=%.2f disc=%.2f spread=%.2f "
+            "premium=%.2f lookback=%d age=%.0fs",
+            kwargs["global_pump_pct"], kwargs["min_observed_move_pct"],
+            kwargs["min_discount_pct"], kwargs["max_spread_pct"],
+            kwargs["max_local_premium_pct"], kwargs["movement_lookback_scans"],
+            kwargs["max_global_quote_age_sec"],
+        )
 
     def _real_scan_interval_ms(self) -> int:
         cfg = self._bot_cfg
@@ -1626,6 +1634,14 @@ class CryptoScannerApp:
             UnifiedTradingWindow(self.root, self, initial_tab=1)
         else:
             self._show_bot_locked()
+
+    def open_bot_settings(self):
+        """Open SmartEagle Bot on the live tab, then Bot Settings."""
+        if not self._has_bot_access():
+            self._show_bot_locked()
+            return
+        from gui.unified_trading_window import UnifiedTradingWindow
+        UnifiedTradingWindow(self.root, self, initial_tab=1, open_settings=True)
 
     def open_signal_performance(self):
         try:

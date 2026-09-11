@@ -16,7 +16,7 @@
   "max_drawdown_percent": 10.0,
   "halt_on_max_drawdown": true,
   "pump_threshold_pct": 3.0,
-  "movement_lookback_scans": 6,
+  "movement_lookback_scans": 4,
   "stop_loss_pct": 3.0,
   "trailing_distance_pct": 1.5,
   "trailing_activation_pct": 1.5,

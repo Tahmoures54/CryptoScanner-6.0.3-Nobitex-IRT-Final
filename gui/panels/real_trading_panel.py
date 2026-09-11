@@ -40,6 +40,7 @@ from gui.trading_ui_helpers import (
 from trading.bot_config import BotConfig, load_config, save_config
 from signal_tracker import SignalTracker
 from trading.trader import TradingBot
+from core.irt_money import parse_amount, quote_uses_toman, rial_to_toman, toman_to_rial
 
 if TYPE_CHECKING:
     from gui.gui_main import CryptoScannerApp
@@ -1296,7 +1297,7 @@ class BotSettingsWindow(BaseDialog):
         "max_drawdown_percent": 15.0,
         "pump_threshold_pct": 5.0,
         "take_profit_percent": 10.0,
-        "fixed_position_quote": 50.0,
+        "fixed_position_quote": 750000.0,
         "max_position_pct": 10.0,
         "min_volume_24h": 500000.0,
         "cooldown_after_loss_min": 30,
@@ -1305,7 +1306,7 @@ class BotSettingsWindow(BaseDialog):
 
     def __init__(self, parent: tk.Widget, panel: RealTradingPanel):
         super().__init__(
-            parent, panel.app, title="⚙️ Bot Settings", width=680, height=720,
+            parent, panel.app, title="⚙️ Bot Settings", width=720, height=780,
             resizable=(True, True),
         )
         self.panel = panel
@@ -1342,8 +1343,95 @@ class BotSettingsWindow(BaseDialog):
     def _build_content(self) -> None:
         self._build_exchange_section(self.scrollable_frame)
         self._build_capital_section(self.scrollable_frame)
+        self._build_strategy_section(self.scrollable_frame)
         self._build_risk_section(self.scrollable_frame)
         self._build_extra_section(self.scrollable_frame)
+
+    def _uses_toman(self) -> bool:
+        quote = ""
+        if hasattr(self, "_quote_currency_var"):
+            quote = str(self._quote_currency_var.get() or "")
+        if not quote:
+            quote = str(getattr(self.config, "quote_currency", "IRT") or "IRT")
+        return quote_uses_toman(quote)
+
+    def _money_unit(self) -> str:
+        return "تومان" if self._uses_toman() else str(
+            getattr(self.config, "quote_currency", "USDT") or "USDT"
+        )
+
+    def _money_to_display(self, rial: float) -> str:
+        value = rial_to_toman(rial) if self._uses_toman() else float(rial)
+        if self._uses_toman() or value >= 100:
+            return f"{value:,.0f}"
+        return f"{value:.4f}".rstrip("0").rstrip(".")
+
+    def _money_from_display(self, text: str, default_rial: float) -> float:
+        displayed = parse_amount(
+            text,
+            rial_to_toman(default_rial) if self._uses_toman() else default_rial,
+        )
+        return toman_to_rial(displayed) if self._uses_toman() else displayed
+
+    def _build_strategy_section(self, parent) -> None:
+        sf = tk.LabelFrame(
+            parent, text="🎯  Global Lead → Nobitex (استراتژی زنده)",
+            font=T.font(size=T.FONT_SM, weight="bold"),
+            bg=T.BG_APP, fg=T.PRIMARY, padx=T.PAD_MD, pady=T.PAD_MD,
+        )
+        sf.pack(fill="x", pady=(0, T.PAD_MD))
+        sf.columnconfigure(1, weight=1)
+
+        tk.Label(
+            sf,
+            text="این فیلدها مال ربات‌اند، نه اسکنر بازار.",
+            font=T.font(size=T.FONT_XS),
+            bg=T.BG_APP, fg=T.TEXT_MUTED,
+        ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, T.PAD_SM))
+
+        self._strategy_vars: Dict[str, tk.Variable] = {}
+        row = 1
+        float_fields = [
+            ("global_pump_threshold_pct", "آستانه رشد CMC / Lead (%)", 1.8),
+            ("min_observed_move_pct", "حداقل حرکت مشاهده‌شده CMC (%)", 0.6),
+            ("min_nobitex_discount_pct", "حداقل تخفیف نوبیتکس نسبت به CMC (%)", 0.4),
+            ("max_local_premium_pct", "حداکثر پریمیوم اگر بازار محلی عقب باشد (%)", 1.5),
+            ("max_nobitex_spread_pct", "حداکثر اسپرد نوبیتکس (%)", 2.2),
+            ("min_global_volume_usd", "حداقل حجم ۲۴س CMC (USD)", 300000.0),
+            ("max_global_quote_age_sec", "حداکثر عمر قیمت CMC (ثانیه)", 240.0),
+            ("btc_max_dump_pct", "رد آلت‌ها اگر BTC بیشتر از این بریزد (%)", 1.5),
+        ]
+        int_fields = [
+            ("check_interval_seconds", "فاصله اسکن زنده (ثانیه)", 15),
+            ("movement_lookback_scans", "تعداد اسکن مبنای حرکت", 4),
+            ("max_new_entries_per_cycle", "حداکثر ورود جدید در هر اسکن", 1),
+        ]
+        for key, label, default in float_fields:
+            tk.Label(sf, text=label + ":", font=T.font(size=T.FONT_SM),
+                     bg=T.BG_APP, fg=T.TEXT_SECONDARY).grid(
+                row=row, column=0, sticky="w", pady=T.PAD_XS)
+            var = tk.DoubleVar(value=float(getattr(self.config, key, default)))
+            ttk.Entry(sf, textvariable=var, width=14).grid(
+                row=row, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
+            self._strategy_vars[key] = var
+            row += 1
+        for key, label, default in int_fields:
+            tk.Label(sf, text=label + ":", font=T.font(size=T.FONT_SM),
+                     bg=T.BG_APP, fg=T.TEXT_SECONDARY).grid(
+                row=row, column=0, sticky="w", pady=T.PAD_XS)
+            var = tk.IntVar(value=int(getattr(self.config, key, default)))
+            ttk.Entry(sf, textvariable=var, width=14).grid(
+                row=row, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
+            self._strategy_vars[key] = var
+            row += 1
+
+        self._enable_auto_trading_var = tk.BooleanVar(
+            value=bool(getattr(self.config, "enable_auto_trading", True))
+        )
+        ttk.Checkbutton(
+            sf, text="Enable auto trading (Global Lead)",
+            variable=self._enable_auto_trading_var,
+        ).grid(row=row, column=1, sticky="w", pady=T.PAD_XS)
 
     def _build_exchange_section(self, parent) -> None:
         ef = tk.LabelFrame(
@@ -1398,13 +1486,13 @@ class BotSettingsWindow(BaseDialog):
         cf.columnconfigure(1, weight=1)
 
         tk.Label(
-            cf, text="Account Balance (Quote Currency):", font=T.font(size=T.FONT_SM),
+            cf, text=f"موجودی حساب ({self._money_unit()}):", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=0, column=0, sticky="w", pady=T.PAD_XS)
-        self._account_balance_var = tk.DoubleVar(
-            value=float(getattr(self.config, "account_balance", 10000000.0))
+        self._account_balance_var = tk.StringVar(
+            value=self._money_to_display(float(getattr(self.config, "account_balance", 10000000.0)))
         )
-        ttk.Entry(cf, textvariable=self._account_balance_var, width=15).grid(
+        ttk.Entry(cf, textvariable=self._account_balance_var, width=18).grid(
             row=0, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
         )
 
@@ -1469,67 +1557,112 @@ class BotSettingsWindow(BaseDialog):
         ef.pack(fill="x", pady=(0, T.PAD_MD))
         ef.columnconfigure(1, weight=1)
 
+        unit = self._money_unit()
         tk.Label(
-            ef, text="Fixed Position Quote:", font=T.font(size=T.FONT_SM),
+            ef, text="حالت اندازه معامله:", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=0, column=0, sticky="w", pady=T.PAD_XS)
-        self._fixed_position_var = tk.DoubleVar(
-            value=float(getattr(self.config, "fixed_position_quote", 100.0))
+        self._position_size_mode_var = tk.StringVar(
+            value=str(getattr(self.config, "position_size_mode", "fixed") or "fixed")
         )
-        ttk.Entry(ef, textvariable=self._fixed_position_var, width=15).grid(
-            row=0, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+        ttk.Combobox(
+            ef, textvariable=self._position_size_mode_var,
+            values=["fixed", "risk_percent"], state="readonly", width=16,
+        ).grid(row=0, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
+
+        tk.Label(
+            ef, text=f"مبلغ ثابت هر معامله ({unit}):", font=T.font(size=T.FONT_SM),
+            bg=T.BG_APP, fg=T.TEXT_SECONDARY,
+        ).grid(row=1, column=0, sticky="w", pady=T.PAD_XS)
+        self._fixed_position_var = tk.StringVar(
+            value=self._money_to_display(float(getattr(self.config, "fixed_position_quote", 750000.0)))
+        )
+        ttk.Entry(ef, textvariable=self._fixed_position_var, width=18).grid(
+            row=1, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+        )
+
+        tk.Label(
+            ef, text=f"حداقل ارزش سفارش ({unit}):", font=T.font(size=T.FONT_SM),
+            bg=T.BG_APP, fg=T.TEXT_SECONDARY,
+        ).grid(row=2, column=0, sticky="w", pady=T.PAD_XS)
+        self._min_notional_var = tk.StringVar(
+            value=self._money_to_display(float(getattr(self.config, "min_notional_quote", 300000.0)))
+        )
+        ttk.Entry(ef, textvariable=self._min_notional_var, width=18).grid(
+            row=2, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
         )
 
         tk.Label(
             ef, text="Max Position %:", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
-        ).grid(row=1, column=0, sticky="w", pady=T.PAD_XS)
+        ).grid(row=3, column=0, sticky="w", pady=T.PAD_XS)
         self._max_position_pct_var = tk.DoubleVar(
             value=float(getattr(self.config, "max_position_pct", 20.0))
         )
         ttk.Entry(ef, textvariable=self._max_position_pct_var, width=15).grid(
-            row=1, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+            row=3, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
         )
 
         tk.Label(
             ef, text="Min Volume 24h:", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
-        ).grid(row=2, column=0, sticky="w", pady=T.PAD_XS)
+        ).grid(row=4, column=0, sticky="w", pady=T.PAD_XS)
         self._min_volume_var = tk.DoubleVar(
             value=float(getattr(self.config, "min_volume_24h", 100000.0))
         )
         ttk.Entry(ef, textvariable=self._min_volume_var, width=15).grid(
-            row=2, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+            row=4, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
         )
 
         tk.Label(
             ef, text="Cooldown After Loss (min):", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
-        ).grid(row=3, column=0, sticky="w", pady=T.PAD_XS)
+        ).grid(row=5, column=0, sticky="w", pady=T.PAD_XS)
         self._cooldown_loss_var = tk.IntVar(
             value=int(getattr(self.config, "cooldown_after_loss_min", 15))
         )
         ttk.Entry(ef, textvariable=self._cooldown_loss_var, width=15).grid(
-            row=3, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+            row=5, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
         )
 
         tk.Label(
             ef, text="Cooldown After Win (min):", font=T.font(size=T.FONT_SM),
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
-        ).grid(row=4, column=0, sticky="w", pady=T.PAD_XS)
+        ).grid(row=6, column=0, sticky="w", pady=T.PAD_XS)
         self._cooldown_win_var = tk.IntVar(
             value=int(getattr(self.config, "cooldown_after_win_min", 15))
         )
         ttk.Entry(ef, textvariable=self._cooldown_win_var, width=15).grid(
-            row=4, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+            row=6, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
         )
+
+        tk.Label(
+            ef, text="Confirmation %:", font=T.font(size=T.FONT_SM),
+            bg=T.BG_APP, fg=T.TEXT_SECONDARY,
+        ).grid(row=7, column=0, sticky="w", pady=T.PAD_XS)
+        self._confirmation_pct_var = tk.DoubleVar(
+            value=float(getattr(self.config, "confirmation_pct", 0.35))
+        )
+        ttk.Entry(ef, textvariable=self._confirmation_pct_var, width=15).grid(
+            row=7, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
+        )
+
+        self._confirmation_enabled_var = tk.BooleanVar(
+            value=bool(getattr(self.config, "confirmation_enabled", True))
+        )
+        ttk.Checkbutton(
+            ef, text="Enable entry confirmation",
+            variable=self._confirmation_enabled_var,
+        ).grid(row=8, column=1, sticky="w", pady=T.PAD_XS)
 
     def _reset_to_defaults(self) -> None:
         self._exchange_var.set(self.DEFAULT_SETTINGS["exchange"])
         self._api_key_var.set(self.DEFAULT_SETTINGS["api_key"])
         self._api_secret_var.set(self.DEFAULT_SETTINGS["api_secret"])
         self._testnet_var.set(self.DEFAULT_SETTINGS["testnet"])
-        self._account_balance_var.set(self.DEFAULT_SETTINGS["account_balance"])
+        self._account_balance_var.set(
+            self._money_to_display(float(self.DEFAULT_SETTINGS["account_balance"]))
+        )
         self._quote_currency_var.set(self.DEFAULT_SETTINGS["quote_currency"])
         self._risk_vars["risk_per_trade_pct"].set(self.DEFAULT_SETTINGS["risk_per_trade_pct"])
         self._risk_vars["max_open_positions"].set(self.DEFAULT_SETTINGS["max_open_positions"])
@@ -1538,13 +1671,42 @@ class BotSettingsWindow(BaseDialog):
         self._risk_vars["max_drawdown_percent"].set(self.DEFAULT_SETTINGS["max_drawdown_percent"])
         self._pump_var.set(self.DEFAULT_SETTINGS["pump_threshold_pct"])
         self._take_profit_var.set(self.DEFAULT_SETTINGS["take_profit_percent"])
-        self._fixed_position_var.set(self.DEFAULT_SETTINGS["fixed_position_quote"])
+        self._fixed_position_var.set(
+            self._money_to_display(float(self.DEFAULT_SETTINGS["fixed_position_quote"]))
+        )
         self._max_position_pct_var.set(self.DEFAULT_SETTINGS["max_position_pct"])
         self._min_volume_var.set(self.DEFAULT_SETTINGS["min_volume_24h"])
         self._cooldown_loss_var.set(self.DEFAULT_SETTINGS["cooldown_after_loss_min"])
         self._cooldown_win_var.set(self.DEFAULT_SETTINGS["cooldown_after_win_min"])
         if hasattr(self, "_nobitex_market_var"):
             self._nobitex_market_var.set("IRT")
+        if hasattr(self, "_strategy_vars"):
+            defaults = {
+                "global_pump_threshold_pct": 1.8,
+                "min_observed_move_pct": 0.6,
+                "min_nobitex_discount_pct": 0.4,
+                "max_local_premium_pct": 1.5,
+                "max_nobitex_spread_pct": 2.2,
+                "min_global_volume_usd": 300000.0,
+                "max_global_quote_age_sec": 240.0,
+                "btc_max_dump_pct": 1.5,
+                "check_interval_seconds": 15,
+                "movement_lookback_scans": 4,
+                "max_new_entries_per_cycle": 1,
+            }
+            for key, value in defaults.items():
+                if key in self._strategy_vars:
+                    self._strategy_vars[key].set(value)
+        if hasattr(self, "_enable_auto_trading_var"):
+            self._enable_auto_trading_var.set(True)
+        if hasattr(self, "_position_size_mode_var"):
+            self._position_size_mode_var.set("fixed")
+        if hasattr(self, "_min_notional_var"):
+            self._min_notional_var.set(self._money_to_display(300000.0))
+        if hasattr(self, "_confirmation_enabled_var"):
+            self._confirmation_enabled_var.set(True)
+        if hasattr(self, "_confirmation_pct_var"):
+            self._confirmation_pct_var.set(0.35)
 
     @staticmethod
     def _get_float_or(var, default: float) -> float:
@@ -1567,7 +1729,9 @@ class BotSettingsWindow(BaseDialog):
         self.config.api_key = self._api_key_var.get().strip()
         self.config.api_secret = self._api_secret_var.get().strip()
         self.config.testnet = self._testnet_var.get()
-        self.config.account_balance = self._get_float_or(self._account_balance_var, 10000000.0)
+        self.config.account_balance = self._money_from_display(
+            self._account_balance_var.get(), 10000000.0
+        )
         self.config.quote_currency = self._quote_currency_var.get().strip().upper() or "IRT"
 
         for key, var in self._risk_vars.items():
@@ -1580,7 +1744,21 @@ class BotSettingsWindow(BaseDialog):
 
         self.config.pump_threshold_pct = self._get_float_or(self._pump_var, 5.0)
         self.config.take_profit_percent = self._get_float_or(self._take_profit_var, 0.0)
-        self.config.fixed_position_quote = self._get_float_or(self._fixed_position_var, 100.0)
+        self.config.fixed_position_quote = self._money_from_display(
+            self._fixed_position_var.get(), 750000.0
+        )
+        self.config.min_notional_quote = self._money_from_display(
+            self._min_notional_var.get() if hasattr(self, "_min_notional_var") else "30000",
+            300000.0,
+        )
+        if hasattr(self, "_position_size_mode_var"):
+            self.config.position_size_mode = (
+                str(self._position_size_mode_var.get() or "fixed").strip().lower()
+            )
+        if hasattr(self, "_confirmation_enabled_var"):
+            self.config.confirmation_enabled = bool(self._confirmation_enabled_var.get())
+        if hasattr(self, "_confirmation_pct_var"):
+            self.config.confirmation_pct = self._get_float_or(self._confirmation_pct_var, 0.35)
         self.config.max_position_pct = self._get_float_or(self._max_position_pct_var, 20.0)
         self.config.min_volume_24h = self._get_float_or(self._min_volume_var, 100000.0)
         self.config.cooldown_after_loss_min = self._get_int_or(self._cooldown_loss_var, 15)
@@ -1591,13 +1769,49 @@ class BotSettingsWindow(BaseDialog):
             if self.config.nobitex_market.upper() == "IRT":
                 self.config.quote_currency = "IRT"
 
+        self.config.strategy = "global_lead_local_lag"
+        self.config.global_signal_source = "CoinMarketCap"
+        if hasattr(self, "_enable_auto_trading_var"):
+            self.config.enable_auto_trading = bool(self._enable_auto_trading_var.get())
+        int_keys = {"check_interval_seconds", "movement_lookback_scans", "max_new_entries_per_cycle"}
+        for key, var in getattr(self, "_strategy_vars", {}).items():
+            if key in int_keys:
+                setattr(self.config, key, self._get_int_or(var, int(getattr(self.config, key, 1))))
+            else:
+                setattr(self.config, key, self._get_float_or(var, float(getattr(self.config, key, 0.0))))
+
         self.panel._save_cfg()
         self.panel.pump_threshold_pct = self.config.pump_threshold_pct
         self.panel._apply_config_to_tracker()
+        app = self.panel.app
+        app._bot_cfg = self.config
+        app._real_strategy_name = "global_lead_local_lag"
+        if hasattr(app, "_configure_global_lead_engine"):
+            try:
+                app._configure_global_lead_engine(self.config)
+            except Exception as exc:
+                logger.warning("Could not apply Global Lead settings: %s", exc)
+        if hasattr(self, "_enable_auto_trading_var"):
+            setter = getattr(app, "set_real_auto_entries", None)
+            if callable(setter):
+                setter(bool(self.config.enable_auto_trading))
+        if hasattr(app, "real_signal_tracker") and app.real_signal_tracker is not None:
+            app.real_signal_tracker.max_new_entries_per_cycle = int(
+                getattr(self.config, "max_new_entries_per_cycle", 1) or 1
+            )
+            app.real_signal_tracker.confirmation_enabled = bool(
+                getattr(self.config, "confirmation_enabled", True)
+            )
+            app.real_signal_tracker.confirmation_pct = float(
+                getattr(self.config, "confirmation_pct", 0.35)
+            )
         self.panel.refresh_signals()
         messagebox.showinfo(
             "Saved",
-            "Bot configuration saved successfully.\nRestart the bot to apply exchange changes.",
+            "Bot configuration saved.\n"
+            "Trading settings live here (Bot → Settings), not in the market scanner.\n"
+            "IRT amounts are entered in Toman and stored as Rial.\n"
+            "Restart the bot to apply exchange key changes.",
             parent=self.panel,
         )
         self.close()
