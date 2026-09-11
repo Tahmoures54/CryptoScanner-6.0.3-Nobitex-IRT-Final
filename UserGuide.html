@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CryptoScanner v6.0 – Professional crypto trading scanner with AI signals, backtesting, machine learning trade coach, and automated bot. 7-day free trial.">
+    <title>CryptoScanner v6.0 – The Ultimate Edge for Disciplined Traders</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+    :root {
+        --primary:       #00A8A8;
+        --primary-dark:  #007A7A;
+        --primary-darker:#005F5F;
+        --primary-light: #E0F7F7;
+        --primary-ghost: #F0FAFA;
+        --gold:          #D4AF37;
+        --gold-dark:     #B5952F;
+        --urgent:        #E53E3E;
+        --urgent-dark:   #C53030;
+        --success:       #059669;
+        --warning:       #D97706;
+        --sidebar-bg:    #0F1923;
+        --sidebar-hover: rgba(0,168,168,0.18);
+        --bg-body:       #F5F7FA;
+        --bg-card:       #FFFFFF;
+        --bg-alt:        #F8FAFC;
+        --text-dark:     #1A2E35;
+        --text-mid:      #4A6670;
+        --text-muted:    #8AABAF;
+        --text-on-dark:  #E8F5F5;
+        --border:        #E2E8F0;
+        --border-strong: #C8E0E0;
+        --radius-sm:  8px;
+        --radius-md: 14px;
+        --radius-lg: 20px;
+        --shadow-sm: 0 1px 3px rgba(0,0,0,.06);
+        --shadow-md: 0 4px 12px rgba(0,0,0,.08);
+        --shadow-lg: 0 12px 32px rgba(0,168,168,.12);
+        --font-mono: 'JetBrains Mono', monospace;
+        --sidebar-w: 290px;
+        --topbar-h:  64px;
+    }
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; font-size:16px; }
+    body {
+        font-family:'Inter',sans-serif;
+        background:var(--bg-body);
+        color:var(--text-dark);
+        line-height:1.8;
+        -webkit-font-smoothing:antialiased;
+    }
+    a { color:var(--primary); text-decoration:none; transition:.25s; }
+    a:hover { color:var(--primary-dark); }
+    img { max-width:100%; height:auto; }
+    code {
+        font-family:var(--font-mono);
+        background:#F1F5F9;
+        color:#E53E3E;
+        padding:3px 8px;
+        border-radius:6px;
+        font-size:.88rem;
+    }
+
+    .container { display:flex; min-height:100vh; }
+
+    .sidebar {
+        width:var(--sidebar-w);
+        background:var(--sidebar-bg);
+        color:var(--text-on-dark);
+        padding:2rem 1.2rem;
+        position:fixed;
+        top:0; left:0; bottom:0;
+        overflow-y:auto;
+        display:flex;
+        flex-direction:column;
+        gap:1.2rem;
+        z-index:200;
+        scrollbar-width:thin;
+        scrollbar-color:var(--primary-darker) transparent;
+    }
+    .sidebar::-webkit-scrollbar { width:4px; }
+    .sidebar::-webkit-scrollbar-thumb { background:var(--primary-darker); border-radius:4px; }
+
+    .sidebar-logo { text-align:center; padding-bottom:1.2rem; border-bottom:1px solid rgba(255,255,255,.08); }
+    .sidebar-logo img {
+        width:96px; height:96px;
+        border-radius:50%;
+        border:3px solid var(--primary);
+        box-shadow:0 0 20px rgba(0,168,168,.4);
+        object-fit:cover;
+    }
+    .sidebar-logo .app-name { margin-top:.7rem; font-size:1.25rem; font-weight:800; color:#fff; }
+    .sidebar-logo .app-name i { color:var(--primary); margin-right:6px; }
+    .sidebar-logo .version-badge {
+        display:inline-block; margin-top:.35rem;
+        background:rgba(0,168,168,.15); color:var(--primary);
+        font-size:.72rem; font-weight:700; padding:3px 10px;
+        border-radius:20px; letter-spacing:.5px;
+    }
+
+    .whatsapp-btn {
+        display:flex; align-items:center; justify-content:center; gap:10px;
+        background:#25D366; color:#fff; padding:11px 16px;
+        border-radius:var(--radius-sm); font-weight:700; font-size:.9rem; transition:.25s;
+    }
+    .whatsapp-btn:hover {
+        background:#1EB85A; transform:translateY(-2px);
+        box-shadow:0 6px 16px rgba(37,211,102,.35); color:#fff;
+    }
+
+    .nav-section-label {
+        font-size:.68rem; font-weight:700; letter-spacing:1.5px;
+        text-transform:uppercase; color:rgba(255,255,255,.3);
+        padding:0 10px; margin-top:.5rem;
+    }
+
+    .sidebar nav ul { list-style:none; display:flex; flex-direction:column; gap:2px; }
+    .sidebar nav li a {
+        display:flex; align-items:center; gap:12px;
+        padding:10px 14px; border-radius:var(--radius-sm);
+        color:rgba(255,255,255,.6); font-weight:500; font-size:.9rem; transition:.2s;
+    }
+    .sidebar nav li a i { width:20px; text-align:center; color:var(--primary); font-size:1rem; flex-shrink:0; }
+    .sidebar nav li a:hover, .sidebar nav li a.active {
+        background:var(--sidebar-hover); color:#fff; transform:translateX(4px);
+    }
+
+    .sidebar-footer {
+        margin-top:auto; padding-top:1rem;
+        border-top:1px solid rgba(255,255,255,.08);
+        font-size:.75rem; color:rgba(255,255,255,.25); text-align:center; line-height:1.6;
+    }
+
+    main { margin-left:var(--sidebar-w); padding:4rem 4.5rem; max-width:1100px; width:100%; }
+
+    .mobile-topbar {
+        display:none; position:fixed; top:0; left:0; right:0;
+        height:var(--topbar-h); background:var(--sidebar-bg); z-index:300;
+        padding:0 1.5rem; align-items:center; justify-content:space-between;
+        box-shadow:0 2px 12px rgba(0,0,0,.15);
+    }
+    .mobile-topbar .logo-text { color:#fff; font-weight:800; font-size:1.1rem; }
+    .mobile-topbar .logo-text i { color:var(--primary); margin-right:6px; }
+    #menu-toggle { background:none; border:none; color:#fff; font-size:1.4rem; cursor:pointer; }
+
+    /* Typography */
+    .hero-eyebrow {
+        display:inline-flex; align-items:center; gap:8px;
+        background:var(--primary-light); color:var(--primary-dark);
+        font-weight:700; font-size:.82rem; padding:5px 14px;
+        border-radius:20px; letter-spacing:.5px; text-transform:uppercase; margin-bottom:1.2rem;
+    }
+    h1.hero-title { font-size:3rem; font-weight:800; line-height:1.15; color:var(--text-dark); margin-bottom:1rem; }
+    h1.hero-title em { font-style:normal; color:var(--primary); }
+
+    h2.section-title {
+        font-size:1.9rem; font-weight:800; margin:3.5rem 0 1.2rem;
+        color:var(--text-dark); display:flex; align-items:center; gap:12px;
+        padding-bottom:.6rem; border-bottom:2px solid var(--primary-light);
+    }
+    h2.section-title i { color:var(--primary); font-size:1.5rem; }
+    h2.section-title .section-badge {
+        margin-left:auto; font-size:.72rem; font-weight:700;
+        background:#FFF8E1; color:var(--gold-dark); border:1px solid var(--gold);
+        padding:3px 10px; border-radius:20px; letter-spacing:.5px;
+    }
+    h3 { font-size:1.2rem; font-weight:700; margin:1.5rem 0 .7rem; color:var(--text-dark); }
+    p { color:var(--text-mid); font-size:1rem; margin:.9rem 0; }
+    ul, ol { padding-left:1.4rem; color:var(--text-mid); }
+    li { margin:.55rem 0; }
+    li strong { color:var(--text-dark); }
+
+    /* Cards */
+    .card {
+        background:var(--bg-card); border:1px solid var(--border);
+        border-radius:var(--radius-md); padding:2rem; margin:1.5rem 0;
+        box-shadow:var(--shadow-sm); transition:box-shadow .25s, transform .25s;
+    }
+    .card:hover { box-shadow:var(--shadow-lg); }
+    .card.accent-border { border-left:4px solid var(--primary); }
+    .card.gold-border { border:2px solid var(--gold); background:linear-gradient(145deg,#fff,#fffdf5); }
+    .card.urgent-border { border-left:5px solid var(--urgent); background:#FFF5F5; }
+    .card.dark-card { background:var(--sidebar-bg); color:var(--text-on-dark); border:none; }
+    .card.dark-card p, .card.dark-card li { color:rgba(255,255,255,.7); }
+    .card.dark-card strong { color:#fff; }
+    .card.success-border { border-left:5px solid var(--success); background:#F0FDF4; }
+    .card.ai-border {
+        border:2px solid var(--primary);
+        background:linear-gradient(135deg, var(--primary-ghost), #fff);
+    }
+
+    .info-box {
+        background:var(--primary-ghost); border:1px solid var(--border-strong);
+        border-radius:var(--radius-sm); padding:1rem 1.4rem;
+        display:flex; gap:12px; align-items:flex-start; margin:1rem 0;
+    }
+    .info-box i { color:var(--primary); font-size:1.1rem; margin-top:2px; flex-shrink:0; }
+    .info-box p { margin:0; font-size:.95rem; }
+
+    .warning-box {
+        background:#FFF8E1; border:1px solid var(--gold);
+        border-radius:var(--radius-sm); padding:1rem 1.4rem;
+        display:flex; gap:12px; align-items:flex-start; margin:1rem 0;
+    }
+    .warning-box i { color:var(--gold-dark); font-size:1.1rem; margin-top:2px; flex-shrink:0; }
+    .warning-box p { margin:0; font-size:.95rem; color:#7D6008; }
+
+    .danger-box {
+        background:#FFF5F5; border:1px solid #FCA5A5;
+        border-radius:var(--radius-sm); padding:1rem 1.4rem;
+        display:flex; gap:12px; align-items:flex-start; margin:1rem 0;
+    }
+    .danger-box i { color:var(--urgent); font-size:1.1rem; margin-top:2px; flex-shrink:0; }
+    .danger-box p { margin:0; font-size:.95rem; color:#991B1B; }
+
+    .success-box {
+        background:#F0FDF4; border:1px solid #86EFAC;
+        border-radius:var(--radius-sm); padding:1rem 1.4rem;
+        display:flex; gap:12px; align-items:flex-start; margin:1rem 0;
+    }
+    .success-box i { color:var(--success); font-size:1.1rem; margin-top:2px; flex-shrink:0; }
+    .success-box p { margin:0; font-size:.95rem; color:#065F46; }
+
+    /* Buttons */
+    .btn {
+        display:inline-flex; align-items:center; gap:9px;
+        font-weight:700; padding:13px 28px; border-radius:var(--radius-sm);
+        border:none; cursor:pointer; transition:.25s; font-size:.95rem; text-decoration:none;
+    }
+    .btn-primary { background:var(--primary); color:#fff; box-shadow:0 4px 14px rgba(0,168,168,.35); }
+    .btn-primary:hover { background:var(--primary-dark); transform:translateY(-2px); color:#fff; }
+    .btn-gold { background:var(--gold); color:#fff; box-shadow:0 4px 14px rgba(212,175,55,.35); }
+    .btn-gold:hover { background:var(--gold-dark); transform:translateY(-2px); color:#fff; }
+    .btn-urgent { background:var(--urgent); color:#fff; box-shadow:0 4px 14px rgba(229,62,62,.35); }
+    .btn-urgent:hover { background:var(--urgent-dark); transform:translateY(-2px); color:#fff; }
+    .btn-outline { background:transparent; color:var(--primary); border:2px solid var(--primary); }
+    .btn-outline:hover { background:var(--primary); color:#fff; }
+    .btn-group { display:flex; flex-wrap:wrap; gap:12px; margin:1.5rem 0; }
+
+    /* Tables */
+    .table-wrap { overflow-x:auto; margin:1.5rem 0; border-radius:var(--radius-sm); border:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; }
+    th {
+        background:var(--bg-alt); color:var(--text-dark); font-weight:700;
+        font-size:.88rem; padding:12px 16px; text-align:left;
+        border-bottom:2px solid var(--border); white-space:nowrap;
+    }
+    td { padding:11px 16px; border-bottom:1px solid var(--border); font-size:.92rem; color:var(--text-mid); vertical-align:middle; }
+    tr:last-child td { border-bottom:none; }
+    tr:hover td { background:var(--primary-ghost); }
+
+    /* Grids */
+    .grid-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:1.4rem; margin:1.5rem 0; }
+    .grid-3 { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:1.4rem; margin:1.5rem 0; }
+    .grid-4 { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1.2rem; margin:1.5rem 0; }
+
+    .feature-card {
+        background:var(--bg-card); border:1px solid var(--border);
+        border-radius:var(--radius-md); padding:1.6rem; transition:.25s;
+    }
+    .feature-card:hover { box-shadow:var(--shadow-lg); transform:translateY(-3px); }
+    .feature-card .fc-icon {
+        width:48px; height:48px; background:var(--primary-light);
+        border-radius:12px; display:flex; align-items:center; justify-content:center; margin-bottom:1rem;
+    }
+    .feature-card .fc-icon i { font-size:1.3rem; color:var(--primary); }
+    .feature-card h3 { margin:.5rem 0; font-size:1.05rem; }
+    .feature-card p { font-size:.9rem; margin:.4rem 0 0; }
+
+    .stat-card {
+        background:var(--bg-card); border:1px solid var(--border);
+        border-radius:var(--radius-md); padding:1.4rem; text-align:center;
+    }
+    .stat-card .stat-num { font-size:2rem; font-weight:800; color:var(--primary); }
+    .stat-card .stat-label { font-size:.82rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+
+    .score-row { display:flex; align-items:center; gap:12px; margin:.6rem 0; }
+    .score-row .score-label { width:140px; font-size:.88rem; font-weight:600; color:var(--text-dark); flex-shrink:0; }
+    .score-bar-track { flex:1; background:#E2E8F0; border-radius:20px; height:8px; overflow:hidden; }
+    .score-bar-fill { height:100%; background:var(--primary); border-radius:20px; }
+    .score-row .score-val { font-size:.85rem; font-weight:700; color:var(--text-dark); width:40px; text-align:right; }
+
+    .signal-tag { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border-radius:20px; font-weight:700; font-size:.8rem; }
+    .tag-strong-buy  { background:#D1FAE5; color:#065F46; }
+    .tag-buy         { background:#ECFDF5; color:#059669; }
+    .tag-neutral     { background:#F3F4F6; color:#6B7280; }
+    .tag-sell        { background:#FFFBEB; color:#D97706; }
+    .tag-strong-sell { background:#FEE2E2; color:#991B1B; }
+
+    .risk-pill { display:inline-block; padding:3px 10px; border-radius:20px; font-size:.78rem; font-weight:700; }
+    .risk-low     { background:#D1FAE5; color:#065F46; }
+    .risk-medium  { background:#FEF3C7; color:#92400E; }
+    .risk-high    { background:#FEE2E2; color:#991B1B; }
+    .risk-extreme { background:#1A1A2E; color:#FF4444; }
+
+    .timeline { position:relative; padding-left:2rem; margin:1.5rem 0; }
+    .timeline::before {
+        content:''; position:absolute; left:8px; top:0; bottom:0;
+        width:2px; background:var(--primary-light);
+    }
+    .timeline-item { position:relative; margin:1.2rem 0; }
+    .timeline-item::before {
+        content:''; position:absolute; left:-1.65rem; top:6px;
+        width:14px; height:14px; border-radius:50%;
+        background:var(--primary); border:3px solid var(--primary-light);
+    }
+    .timeline-item .tl-title { font-weight:700; color:var(--text-dark); margin-bottom:.3rem; }
+    .timeline-item p { margin:0; font-size:.9rem; }
+
+    .steps { counter-reset:step; display:flex; flex-direction:column; gap:1rem; margin:1rem 0; }
+    .step { display:flex; gap:1rem; align-items:flex-start; background:var(--bg-alt); border-radius:var(--radius-sm); padding:1rem 1.2rem; }
+    .step-num {
+        width:32px; height:32px; background:var(--primary); color:#fff;
+        border-radius:50%; display:flex; align-items:center; justify-content:center;
+        font-weight:800; font-size:.9rem; flex-shrink:0;
+    }
+    .step-body .step-title { font-weight:700; color:var(--text-dark); }
+    .step-body p { margin:.3rem 0 0; font-size:.9rem; }
+
+    /* Paper Trading Simulator Widget */
+    .sim-widget {
+        background:linear-gradient(135deg, #0F1923, #1a2f3f);
+        border-radius:var(--radius-md); padding:1.8rem; margin:1.5rem 0; color:#fff;
+        border:1px solid rgba(0,168,168,.3);
+    }
+    .sim-widget h3 { color:var(--primary); margin-top:0; }
+    .sim-controls { display:flex; flex-wrap:wrap; gap:1rem; margin:1rem 0; }
+    .sim-control { display:flex; flex-direction:column; gap:4px; }
+    .sim-control label { font-size:.78rem; color:rgba(255,255,255,.5); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+    .sim-control input, .sim-control select {
+        background:rgba(255,255,255,.08); border:1px solid rgba(0,168,168,.3);
+        border-radius:6px; padding:8px 12px; color:#fff; font-size:.9rem; width:140px;
+    }
+    .sim-results {
+        display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+        gap:1rem; margin-top:1.2rem; padding-top:1.2rem;
+        border-top:1px solid rgba(255,255,255,.1);
+    }
+    .sim-result-item { text-align:center; }
+    .sim-result-val { font-size:1.4rem; font-weight:800; }
+    .sim-result-val.positive { color:#34D399; }
+    .sim-result-val.negative { color:#F87171; }
+    .sim-result-label { font-size:.75rem; color:rgba(255,255,255,.4); text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+    .sim-btn {
+        background:var(--primary); color:#fff; border:none; padding:10px 24px;
+        border-radius:var(--radius-sm); font-weight:700; cursor:pointer;
+        transition:.2s; margin-top:1rem; font-size:.9rem;
+    }
+    .sim-btn:hover { background:var(--primary-dark); transform:translateY(-1px); }
+
+    /* Lesson Card */
+    .lesson-card {
+        border-left:4px solid var(--urgent);
+        background:linear-gradient(135deg, #FFF5F5, #fff);
+        border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+        padding:1.2rem 1.5rem; margin:.8rem 0;
+    }
+    .lesson-card .lesson-header {
+        display:flex; align-items:center; gap:10px; margin-bottom:.5rem;
+    }
+    .lesson-card .lesson-icon {
+        width:36px; height:36px; background:#FEE2E2;
+        border-radius:8px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .lesson-card .lesson-icon i { color:var(--urgent); font-size:.95rem; }
+    .lesson-card .lesson-title { font-weight:700; color:var(--text-dark); font-size:.95rem; }
+    .lesson-card p { margin:0; font-size:.88rem; color:var(--text-mid); }
+    .lesson-card.lesson-success {
+        border-left-color:var(--success);
+        background:linear-gradient(135deg, #F0FDF4, #fff);
+    }
+    .lesson-card.lesson-success .lesson-icon { background:#D1FAE5; }
+    .lesson-card.lesson-success .lesson-icon i { color:var(--success); }
+
+    /* AI Insight Box */
+    .ai-insight {
+        background:linear-gradient(135deg, #0F1923, #0a2435);
+        border:1px solid rgba(0,168,168,.4);
+        border-radius:var(--radius-md);
+        padding:1.5rem; margin:1.2rem 0; position:relative; overflow:hidden;
+    }
+    .ai-insight::before {
+        content:''; position:absolute; top:-30px; right:-30px;
+        width:120px; height:120px; background:rgba(0,168,168,.05); border-radius:50%;
+    }
+    .ai-insight .ai-badge {
+        display:inline-flex; align-items:center; gap:6px;
+        background:rgba(0,168,168,.15); color:var(--primary);
+        font-size:.72rem; font-weight:700; padding:4px 10px;
+        border-radius:20px; margin-bottom:.8rem;
+    }
+    .ai-insight p { color:rgba(255,255,255,.8); margin:0; font-size:.92rem; }
+    .ai-insight strong { color:var(--primary); }
+
+    /* Backtest Result Mock */
+    .backtest-result {
+        background:var(--bg-alt); border:1px solid var(--border);
+        border-radius:var(--radius-md); padding:1.5rem; margin:1rem 0;
+    }
+    .backtest-result .bt-header {
+        display:flex; align-items:center; justify-content:space-between;
+        margin-bottom:1rem; padding-bottom:1rem; border-bottom:1px solid var(--border);
+    }
+    .backtest-result .bt-title { font-weight:700; color:var(--text-dark); }
+    .backtest-result .bt-badge {
+        background:var(--primary-light); color:var(--primary-dark);
+        font-size:.75rem; font-weight:700; padding:4px 10px; border-radius:20px;
+    }
+    .bt-metrics { display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:1rem; }
+    .bt-metric { text-align:center; }
+    .bt-metric .bt-val { font-size:1.3rem; font-weight:800; }
+    .bt-metric .bt-val.win { color:var(--success); }
+    .bt-metric .bt-val.loss { color:var(--urgent); }
+    .bt-metric .bt-val.neutral { color:var(--primary); }
+    .bt-metric .bt-lbl { font-size:.72rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-top:2px; }
+
+    /* Compare Table */
+    .compare-table th:first-child { width:200px; }
+    .check { color:var(--success); font-weight:700; }
+    .cross { color:#CBD5E0; }
+    .gold-check { color:var(--gold-dark); font-weight:700; }
+
+    /* CTA */
+    .cta-section {
+        background:linear-gradient(135deg, var(--primary-darker), var(--primary));
+        color:#fff; padding:3.5rem; border-radius:var(--radius-lg);
+        text-align:center; margin:3.5rem 0; position:relative; overflow:hidden;
+    }
+    .cta-section::before {
+        content:''; position:absolute; top:-50%; right:-10%;
+        width:400px; height:400px; background:rgba(255,255,255,.04); border-radius:50%;
+    }
+    .cta-section h2 { color:#fff; border:none; justify-content:center; font-size:2.2rem; margin:0 0 .8rem; padding:0; }
+    .cta-section p { color:rgba(255,255,255,.85); font-size:1.1rem; }
+    .cta-section .btn-group { justify-content:center; }
+
+    /* Testimonials */
+    .testimonial {
+        background:var(--bg-card); border:1px solid var(--border);
+        border-radius:var(--radius-md); padding:1.6rem; position:relative;
+    }
+    .testimonial::before {
+        content:'"'; position:absolute; top:-.5rem; left:1.2rem;
+        font-size:4rem; color:var(--primary-light); font-family:Georgia, serif; line-height:1;
+    }
+    .testimonial p { font-style:italic; margin:0 0 1rem; }
+    .testimonial .author { font-weight:700; color:var(--text-dark); font-size:.88rem; }
+    .testimonial .author-role { color:var(--text-muted); font-size:.82rem; }
+
+    /* FAQ */
+    .faq-item { border-bottom:1px solid var(--border); padding:1.2rem 0; }
+    .faq-item:last-child { border-bottom:none; }
+    .faq-q { font-weight:700; color:var(--text-dark); cursor:pointer; display:flex; align-items:center; gap:10px; }
+    .faq-q i { color:var(--primary); transition:.25s; flex-shrink:0; }
+    .faq-a { margin-top:.7rem; font-size:.95rem; color:var(--text-mid); display:none; }
+
+    /* Pricing */
+    .price-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:1.4rem; margin:2rem 0; }
+    .price-card {
+        border:2px solid var(--border); border-radius:var(--radius-md);
+        padding:1.8rem 1.4rem; text-align:center; transition:.25s; background:var(--bg-card);
+    }
+    .price-card:hover { transform:translateY(-4px); box-shadow:var(--shadow-lg); }
+    .price-card.featured { border-color:var(--gold); background:linear-gradient(160deg,#fff,#fffef8); }
+    .price-card .plan-name { font-weight:800; font-size:1rem; text-transform:uppercase; letter-spacing:.5px; color:var(--text-dark); }
+    .price-card .plan-price { font-size:2.5rem; font-weight:800; color:var(--primary); margin:.5rem 0; }
+    .price-card .plan-price span { font-size:1rem; color:var(--text-muted); }
+    .price-card .plan-badge {
+        display:inline-block; background:var(--gold); color:#fff;
+        font-size:.72rem; font-weight:700; padding:3px 10px; border-radius:20px; margin-bottom:.8rem;
+    }
+    .price-card ul { list-style:none; padding:0; text-align:left; margin:1rem 0 1.4rem; }
+    .price-card li { font-size:.88rem; padding:.35rem 0; color:var(--text-mid); }
+    .price-card li::before { content:'✓ '; color:var(--success); font-weight:700; }
+
+    /* Hero Stats */
+    .hero-stats { display:flex; flex-wrap:wrap; gap:2rem; margin:2rem 0; }
+    .hero-stat .num { font-size:1.8rem; font-weight:800; color:var(--primary); }
+    .hero-stat .lbl { font-size:.8rem; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.5px; }
+
+    .highlight-box {
+        background:var(--primary-light); border:1px solid var(--border-strong);
+        border-radius:var(--radius-sm); padding:1rem 1.4rem; margin:1rem 0;
+    }
+    .highlight-box p { margin:0; font-weight:500; color:var(--primary-darker); }
+
+    .urgency-banner {
+        background:linear-gradient(90deg,var(--urgent),#B91C1C);
+        color:#fff; padding:.9rem 1.8rem; border-radius:var(--radius-sm);
+        display:flex; align-items:center; gap:12px; margin:1.5rem 0; font-weight:600;
+    }
+    .urgency-banner i { font-size:1.2rem; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+
+    /* ROI Calculator */
+    .roi-calc {
+        background:linear-gradient(135deg, #F0FAFA, var(--bg-card));
+        border:2px solid var(--primary-light); border-radius:var(--radius-md);
+        padding:2rem; margin:1.5rem 0;
+    }
+    .roi-calc h3 { margin-top:0; color:var(--primary-dark); }
+    .roi-row { display:flex; align-items:center; justify-content:space-between; padding:.7rem 0; border-bottom:1px dashed var(--border); }
+    .roi-row:last-child { border-bottom:none; font-weight:800; font-size:1.1rem; color:var(--success); }
+    .roi-row span:first-child { color:var(--text-mid); font-size:.92rem; }
+    .roi-row span:last-child { font-weight:700; color:var(--text-dark); }
+
+    /* Tab Trade History Mock */
+    .trade-history-mock {
+        background:var(--sidebar-bg); border-radius:var(--radius-md);
+        padding:1.2rem; margin:1rem 0;
+    }
+    .trade-row {
+        display:flex; align-items:center; gap:1rem;
+        padding:.6rem .8rem; border-radius:6px; margin:.3rem 0; font-size:.85rem;
+    }
+    .trade-row:hover { background:rgba(255,255,255,.05); }
+    .trade-row .symbol { color:#fff; font-weight:700; width:80px; }
+    .trade-row .trade-type { color:var(--primary); font-size:.75rem; background:rgba(0,168,168,.15); padding:2px 8px; border-radius:20px; }
+    .trade-row .pnl { margin-left:auto; font-weight:800; }
+    .trade-row .pnl.win { color:#34D399; }
+    .trade-row .pnl.loss { color:#F87171; }
+    .trade-row .trade-reason { color:rgba(255,255,255,.4); font-size:.75rem; }
+
+    .hero { margin-bottom:2rem; }
+    .site-footer { margin-top:4rem; padding-top:2rem; border-top:1px solid var(--border); text-align:center; }
+    .site-footer p { font-size:.85rem; color:var(--text-muted); margin:.4rem 0; }
+    .site-footer .quote { font-weight:700; font-size:1rem; color:var(--text-dark); font-style:italic; margin-bottom:.5rem; }
+
+    @media(max-width:960px){
+        .sidebar { transform:translateX(-100%); transition:.3s; }
+        .sidebar.open { transform:translateX(0); }
+        .mobile-topbar { display:flex; }
+        main { margin-left:0; padding:5rem 1.5rem 2rem; }
+        h1.hero-title { font-size:2rem; }
+        h2.section-title { font-size:1.5rem; }
+        .cta-section { padding:2rem 1.5rem; }
+        .cta-section h2 { font-size:1.6rem; }
+    }
+    @media(max-width:600px){
+        .hero-stats { gap:1.2rem; }
+        .btn-group { flex-direction:column; }
+        .btn { justify-content:center; }
+        .grid-2,.grid-3,.grid-4 { grid-template-columns:1fr; }
+        .sim-controls { flex-direction:column; }
+        .sim-control input, .sim-control select { width:100%; }
+    }
+    </style>
+</head>
+
+<body>
+
+<div class="mobile-topbar">
+    <span class="logo-text"><i class="fas fa-chart-line"></i> CryptoScanner</span>
+    <button id="menu-toggle" aria-label="Toggle menu"><i class="fas fa-bars"></i></button>
+</div>
+
+<div class="container">
+
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+        <img src="eagle.png" alt="CryptoScanner Eagle Logo" onerror="this.style.display='none'">
+        <div class="app-name"><i class="fas fa-chart-line"></i> CryptoScanner</div>
+        <span class="version-badge">v6.0 • Turquoise Edition</span>
+    </div>
+
+    <a href="https://wa.me/989160684552" class="whatsapp-btn" target="_blank" rel="noopener">
+        <i class="fab fa-whatsapp"></i> +98 916 068 4552
+    </a>
+
+    <nav>
+        <div class="nav-section-label">Overview</div>
+        <ul>
+            <li><a href="#philosophy"><i class="fas fa-chess-knight"></i> Trading Philosophy</a></li>
+            <li><a href="#features"><i class="fas fa-cogs"></i> Core Features</a></li>
+            <li><a href="#stats"><i class="fas fa-chart-bar"></i> By The Numbers</a></li>
+        </ul>
+        <div class="nav-section-label">Engine</div>
+        <ul>
+            <li><a href="#signal-engine"><i class="fas fa-wave-square"></i> Signal Strategies</a></li>
+            <li><a href="#scoring-system"><i class="fas fa-calculator"></i> Scoring System</a></li>
+            <li><a href="#risk-engine"><i class="fas fa-shield-alt"></i> Risk Engine</a></li>
+            <li><a href="#indicators"><i class="fas fa-chart-area"></i> Indicators</a></li>
+        </ul>
+        <div class="nav-section-label">Paper Trading & Backtest</div>
+        <ul>
+            <li><a href="#paper-trading"><i class="fas fa-file-invoice-dollar"></i> Paper Trading</a></li>
+            <li><a href="#paper-scenarios"><i class="fas fa-sliders-h"></i> TP/SL Scenarios</a></li>
+            <li><a href="#backtesting"><i class="fas fa-flask"></i> Backtesting Engine</a></li>
+            <li><a href="#backtest-howto"><i class="fas fa-play-circle"></i> How to Backtest</a></li>
+        </ul>
+        <div class="nav-section-label">AI & Learning</div>
+        <ul>
+            <li><a href="#ai-prediction"><i class="fas fa-brain"></i> AI Win Rate</a></li>
+            <li><a href="#learning-engine"><i class="fas fa-microchip"></i> Trade Learner AI</a></li>
+            <li><a href="#loss-lessons"><i class="fas fa-graduation-cap"></i> Learning from Losses</a></li>
+        </ul>
+        <div class="nav-section-label">Data & Automation</div>
+        <ul>
+            <li><a href="#data-api"><i class="fas fa-database"></i> Market Data APIs</a></li>
+            <li><a href="#automation"><i class="fas fa-robot"></i> SmartEagle Bot</a></li>
+            <li><a href="#bot-settings"><i class="fas fa-sliders-h"></i> Bot Configuration</a></li>
+        </ul>
+        <div class="nav-section-label">Tools & Plans</div>
+        <ul>
+            <li><a href="#toolkit"><i class="fas fa-toolbox"></i> Professional Toolkit</a></li>
+            <li><a href="#installation"><i class="fas fa-download"></i> Installation</a></li>
+            <li><a href="#premium"><i class="fas fa-gem"></i> Premium Plans</a></li>
+            <li><a href="#roi"><i class="fas fa-coins"></i> ROI Calculator</a></li>
+            <li><a href="#faq"><i class="fas fa-question-circle"></i> FAQ</a></li>
+            <li><a href="#support"><i class="fas fa-headset"></i> Support</a></li>
+        </ul>
+    </nav>
+
+    <div class="sidebar-footer">
+        © 2026 CryptoScanner<br>All rights reserved.
+    </div>
+</aside>
+
+<main>
+
+<!-- ─── HERO ─── -->
+<section class="hero" id="hero">
+    <div class="hero-eyebrow">
+        <i class="fas fa-shield-alt"></i>
+        Version 6.0.0 &nbsp;•&nbsp; Turquoise Edition &nbsp;•&nbsp; 7-Day Free Trial
+    </div>
+
+    <h1 class="hero-title">
+        Trade Like the Elite.<br>
+        <em>Or Keep Losing.</em><br>
+        The Choice is Yours.
+    </h1>
+
+    <p style="font-size:1.15rem;font-weight:600;color:var(--text-dark);margin:0 0 .8rem;">
+        The difference between consistent profit and bleeding money is a single systematic tool. This is it.
+    </p>
+    <p>
+        Every day you trade without CryptoScanner, you rely on hope, hype, and luck.
+        The market devours dreamers. It rewards systems. This software is your system —
+        forged from years of quantitative development, battle-tested across bull runs and crashes.
+    </p>
+
+    <div class="urgency-banner">
+        <i class="fas fa-fire"></i>
+        <span>Thousands of traders are already using it. Why aren't you?</span>
+    </div>
+
+    <div class="btn-group">
+        <a href="#premium" class="btn btn-urgent"><i class="fas fa-download"></i> Start Free 7-Day Trial</a>
+        <a href="#paper-trading" class="btn btn-outline"><i class="fas fa-file-invoice-dollar"></i> See Paper Trading</a>
+        <a href="https://wa.me/989160684552" class="btn btn-gold" target="_blank" rel="noopener">
+            <i class="fab fa-whatsapp"></i> Talk to Us
+        </a>
+    </div>
+
+    <div class="hero-stats" id="stats">
+        <div class="hero-stat"><div class="num">500+</div><div class="lbl">Coins Scanned</div></div>
+        <div class="hero-stat"><div class="num">6</div><div class="lbl">Trading Strategies</div></div>
+        <div class="hero-stat"><div class="num">20+</div><div class="lbl">Technical Indicators</div></div>
+        <div class="hero-stat"><div class="num">7</div><div class="lbl">Risk Engines</div></div>
+        <div class="hero-stat"><div class="num">24/7</div><div class="lbl">Bot Automation</div></div>
+        <div class="hero-stat"><div class="num">∞</div><div class="lbl">Lessons Learned</div></div>
+    </div>
+</section>
+
+<!-- ─── PHILOSOPHY ─── -->
+<h2 class="section-title" id="philosophy">
+    <i class="fas fa-chess-knight"></i> The Hard Truth About Crypto Trading
+</h2>
+
+<div class="card accent-border">
+    <p>
+        <strong style="color:var(--urgent)">95% of retail traders lose money.</strong>
+        Not because they are unintelligent — but because they trade without a systematic edge.
+        They buy after a pump, sell after a dump, and watch their portfolio shrink month after month.
+    </p>
+    <p>CryptoScanner erases emotional trading. It enforces three unbreakable rules:</p>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+                <div class="step-title">Never risk more than 2% per trade</div>
+                <p>The bot automatically sizes positions so one bad trade never wipes you out. Position sizing is math, not emotion.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+                <div class="step-title">Always use a Stop Loss — no exceptions</div>
+                <p>The moment a position opens, a stop is set. No "hoping" it recovers. No "just five more minutes."</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+                <div class="step-title">Trust the data, not your gut</div>
+                <p>Our AI analyzes thousands of historical patterns across all market conditions. Your gut has a sample size of one.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="highlight-box">
+        <p>We didn't build a magic money machine. We built a <strong>discipline machine</strong>. The profits come when you stick to the plan — every single time.</p>
+    </div>
+</div>
+
+<!-- ─── FEATURES ─── -->
+<h2 class="section-title" id="features">
+    <i class="fas fa-cogs"></i> What Makes CryptoScanner Irreplaceable
+</h2>
+
+<div class="grid-2">
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-bolt"></i></div>
+        <h3>Real-Time Multi‑Source Data</h3>
+        <p>Fetch up to 500 coins simultaneously from <strong>CoinMarketCap</strong> or <strong>CoinGecko</strong>. See price, volume, market cap, and 1h/24h/7d changes — all in one view. Auto-refreshes every 5 minutes.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+        <h3>Paper Trading with Custom TP/SL</h3>
+        <p>Trade virtually with <strong>zero risk</strong>. Set your own Take Profit and Stop Loss percentages, choose your trade size, and watch the system simulate real outcomes using live market data.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-flask"></i></div>
+        <h3>Built-In Backtesting Engine</h3>
+        <p>Replay any strategy over historical data with 4 pre-built scenarios or fully custom parameters. See win rate, max drawdown, and P&L <em>before</em> risking a single dollar.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-microchip"></i></div>
+        <h3>Self-Learning AI Trade Coach</h3>
+        <p>The TradeLearner engine records every trade, analyzes your <strong>specific loss patterns</strong>, and creates automated rules to block future mistakes. It literally learns from your pain.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-shield-alt"></i></div>
+        <h3>7-Layer Dynamic Risk Assessment</h3>
+        <p>Every asset gets a risk label — <span class="risk-pill risk-low">Low</span> <span class="risk-pill risk-medium">Medium</span> <span class="risk-pill risk-high">High</span> <span class="risk-pill risk-extreme">Extreme</span> — based on volatility, liquidity, market cap, and momentum.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-robot"></i></div>
+        <h3>SmartEagle Automated Bot</h3>
+        <p>Connect to <strong>Binance, Toobit, KuCoin</strong>, or any CCXT-supported exchange. The bot executes entries and exits with precision, manages trailing stops, and moves stop to breakeven automatically.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-brain"></i></div>
+        <h3>AI Win Rate Predictions</h3>
+        <p>VIP users see the historical win probability for every signal. Skip low-confidence setups and concentrate capital on high-probability trades. <strong>Exclusive to Premium.</strong></p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-lock"></i></div>
+        <h3>Military-Grade Security</h3>
+        <p>API keys encrypted with <strong>Fernet AES-128</strong>. User status protected with <strong>PBKDF2-HMAC-SHA256</strong> + device binding. All data stays on your machine. Nothing is ever uploaded.</p>
+    </div>
+</div>
+
+<!-- ─── PAPER TRADING ─── -->
+<h2 class="section-title" id="paper-trading">
+    <i class="fas fa-file-invoice-dollar"></i> Tab 1: Paper Trading — Prove Your Strategy First
+</h2>
+
+<div class="card accent-border">
+    <p>
+        The first tab of the <strong>Smart Trading Center</strong> is your virtual trading laboratory.
+        Every signal the scanner generates is automatically logged. The system tracks entries, monitors prices in real-time,
+        and closes trades when they hit your personal Take Profit or Stop Loss — just like a real exchange would.
+    </p>
+    <p><strong>But here's the key difference from v5:</strong> You are now in full control of the risk parameters.</p>
+
+    <h3 id="paper-scenarios">🎛️ Setting Your Custom TP/SL Scenarios</h3>
+    <p>
+        At the top of Tab 1, you will find the <strong>Paper Trade Settings bar</strong>.
+        This is the most important addition in v6.0 — it allows you to test different risk/reward scenarios
+        without touching a single line of code.
+    </p>
+
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Field</th>
+                <th>Description</th>
+                <th>Example Value</th>
+                <th>Impact</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>Size ($)</strong></td>
+                <td>Dollar amount committed per trade</td>
+                <td>$100</td>
+                <td>Larger size = bigger $ PnL, same % return</td>
+            </tr>
+            <tr>
+                <td><strong>Take Profit (%)</strong></td>
+                <td>Profit target as % above entry price</td>
+                <td>6%</td>
+                <td>Trade closes at +6% automatically</td>
+            </tr>
+            <tr>
+                <td><strong>Stop Loss (%)</strong></td>
+                <td>Max loss as % below entry price</td>
+                <td>2%</td>
+                <td>Trade closes at −2% to protect capital</td>
+            </tr>
+            <tr>
+                <td><strong>Apply PnL button</strong></td>
+                <td>Recalculates all open trades with new settings</td>
+                <td>—</td>
+                <td>Instant preview without waiting for next refresh</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="info-box">
+        <i class="fas fa-lightbulb"></i>
+        <p>
+            <strong>Pro Tip:</strong> Click <strong>Apply PnL</strong> after changing your settings to instantly see how current open trades would perform under your new scenario. This lets you compare conservative vs. aggressive setups side-by-side without making any real trades.
+        </p>
+    </div>
+
+    <h3>Pre-Built Scenario Suggestions for Paper Trading</h3>
+
+    <div class="grid-2" style="margin:1rem 0;">
+        <div class="lesson-card lesson-success" style="border-left-color:var(--primary); background:var(--primary-ghost);">
+            <div class="lesson-header">
+                <div class="lesson-icon" style="background:var(--primary-light);">
+                    <i class="fas fa-shield-alt" style="color:var(--primary);"></i>
+                </div>
+                <div class="lesson-title">🛡️ Conservative (Low Risk)</div>
+            </div>
+            <p>Size: $50 &nbsp;|&nbsp; TP: 4% &nbsp;|&nbsp; SL: 2%<br>
+            <strong>R/R: 1:2</strong> — Wins less per trade but survives longer. Good for volatile market conditions.</p>
+        </div>
+        <div class="lesson-card lesson-success">
+            <div class="lesson-header">
+                <div class="lesson-icon">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <div class="lesson-title">🌟 Swing Trade (Recommended)</div>
+            </div>
+            <p>Size: $100 &nbsp;|&nbsp; TP: 15% &nbsp;|&nbsp; SL: 5%<br>
+            <strong>R/R: 1:3</strong> — Classic swing setup. Even a 33% win rate is profitable here.</p>
+        </div>
+        <div class="lesson-card">
+            <div class="lesson-header">
+                <div class="lesson-icon">
+                    <i class="fas fa-bolt"></i>
+                </div>
+                <div class="lesson-title">⚡ Aggressive Scalp</div>
+            </div>
+            <p>Size: $200 &nbsp;|&nbsp; TP: 3% &nbsp;|&nbsp; SL: 1.5%<br>
+            <strong>R/R: 1:2</strong> — High frequency, small targets. Requires a win rate above 40%.</p>
+        </div>
+        <div class="lesson-card">
+            <div class="lesson-header">
+                <div class="lesson-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="lesson-title">📈 Trend Hunter (Long Hold)</div>
+            </div>
+            <p>Size: $100 &nbsp;|&nbsp; TP: 30% &nbsp;|&nbsp; SL: 10%<br>
+            <strong>R/R: 1:3</strong> — Needs patience. Even 2 wins can offset 5 losses.</p>
+        </div>
+    </div>
+
+    <div class="warning-box">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>
+            <strong>Do not skip the Paper Trading phase.</strong> Run each scenario for at least 20–30 trades before judging it.
+            A small sample size will give you a misleading win rate. The system needs data to show you the truth.
+        </p>
+    </div>
+
+    <h3>📊 Reading Your Paper Trade Dashboard</h3>
+
+    <div class="trade-history-mock">
+        <div style="padding:.5rem .8rem; margin-bottom:.5rem; font-size:.75rem; color:rgba(255,255,255,.3); text-transform:uppercase; letter-spacing:1px;">Live Paper Trade Log</div>
+        <div class="trade-row">
+            <span class="symbol">BTC</span>
+            <span class="trade-type">OPEN</span>
+            <span style="color:rgba(255,255,255,.5);font-size:.8rem;">Entry: $67,420 → Now: $68,100</span>
+            <span class="pnl win">+1.00%</span>
+            <span class="trade-reason">Monitoring...</span>
+        </div>
+        <div class="trade-row">
+            <span class="symbol">SOL</span>
+            <span class="trade-type" style="color:#34D399;background:rgba(52,211,153,.1);">CLOSED</span>
+            <span style="color:rgba(255,255,255,.5);font-size:.8rem;">Entry: $145.2 → Exit: $153.9</span>
+            <span class="pnl win">+6.00%</span>
+            <span class="trade-reason">Take Profit ✓</span>
+        </div>
+        <div class="trade-row">
+            <span class="symbol">DOGE</span>
+            <span class="trade-type" style="color:#F87171;background:rgba(248,113,113,.1);">CLOSED</span>
+            <span style="color:rgba(255,255,255,.5);font-size:.8rem;">Entry: $0.1820 → Exit: $0.1784</span>
+            <span class="pnl loss">-2.00%</span>
+            <span class="trade-reason">Stop Loss ✗</span>
+        </div>
+        <div class="trade-row">
+            <span class="symbol">ETH</span>
+            <span class="trade-type" style="color:#34D399;background:rgba(52,211,153,.1);">CLOSED</span>
+            <span style="color:rgba(255,255,255,.5);font-size:.8rem;">Entry: $3,540 → Exit: $3,752</span>
+            <span class="pnl win">+6.00%</span>
+            <span class="trade-reason">Take Profit ✓</span>
+        </div>
+        <div class="trade-row">
+            <span class="symbol">SHIB</span>
+            <span class="trade-type" style="color:#F87171;background:rgba(248,113,113,.1);">CLOSED</span>
+            <span style="color:rgba(255,255,255,.5);font-size:.8rem;">Entry: $0.0000248 → Exit: $0.0000243</span>
+            <span class="pnl loss">-2.00%</span>
+            <span class="trade-reason">Stop Loss ✗</span>
+        </div>
+    </div>
+
+    <div class="grid-4" style="margin:1.5rem 0;">
+        <div class="stat-card">
+            <div class="stat-num" style="color:var(--success)">66.7%</div>
+            <div class="stat-label">Win Rate</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num" style="color:var(--primary)">+2.13%</div>
+            <div class="stat-label">Avg PnL/Trade</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num">4</div>
+            <div class="stat-label">Closed Trades</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-num" style="color:var(--success)">+6.00%</div>
+            <div class="stat-label">Best Trade</div>
+        </div>
+    </div>
+
+    <div class="success-box">
+        <i class="fas fa-trophy"></i>
+        <p>
+            <strong>When your paper trading shows consistent profit over 30+ trades</strong> with your chosen TP/SL,
+            you are ready for the real bot. This is the safe path. Premium users unlock the bot the moment they're ready —
+            no waiting, no delays.
+            <a href="#premium" style="color:var(--success);font-weight:700;"> Upgrade to Premium →</a>
+        </p>
+    </div>
+</div>
+
+<!-- Interactive Paper Trade Simulator -->
+<div class="sim-widget">
+    <h3><i class="fas fa-calculator"></i> Paper Trade Simulator — Try It Now</h3>
+    <p style="color:rgba(255,255,255,.5);font-size:.88rem;margin:.3rem 0 1rem;">Adjust the parameters to see how different scenarios would have performed on the example trades above.</p>
+    <div class="sim-controls">
+        <div class="sim-control">
+            <label>Trade Size ($)</label>
+            <input type="number" id="sim-size" value="100" min="10" max="10000" step="10">
+        </div>
+        <div class="sim-control">
+            <label>Take Profit (%)</label>
+            <input type="number" id="sim-tp" value="6" min="0.5" max="50" step="0.5">
+        </div>
+        <div class="sim-control">
+            <label>Stop Loss (%)</label>
+            <input type="number" id="sim-sl" value="2" min="0.5" max="20" step="0.5">
+        </div>
+        <div class="sim-control">
+            <label>Win Rate (%)</label>
+            <input type="number" id="sim-wr" value="60" min="1" max="99" step="1">
+        </div>
+        <div class="sim-control">
+            <label>Number of Trades</label>
+            <input type="number" id="sim-trades" value="20" min="5" max="200" step="5">
+        </div>
+    </div>
+    <button class="sim-btn" onclick="runSimulation()"><i class="fas fa-play"></i> Run Simulation</button>
+    <div class="sim-results" id="sim-results">
+        <div class="sim-result-item">
+            <div class="sim-result-val neutral" id="res-pnl">+$64.00</div>
+            <div class="sim-result-label">Net P&L</div>
+        </div>
+        <div class="sim-result-item">
+            <div class="sim-result-val positive" id="res-wins">12</div>
+            <div class="sim-result-label">Winning Trades</div>
+        </div>
+        <div class="sim-result-item">
+            <div class="sim-result-val negative" id="res-losses">8</div>
+            <div class="sim-result-label">Losing Trades</div>
+        </div>
+        <div class="sim-result-item">
+            <div class="sim-result-val" id="res-rr" style="color:var(--primary)">3.00</div>
+            <div class="sim-result-label">R/R Ratio</div>
+        </div>
+        <div class="sim-result-item">
+            <div class="sim-result-val" id="res-expect" style="color:#facc15">+$3.20</div>
+            <div class="sim-result-label">Expectancy/Trade</div>
+        </div>
+    </div>
+</div>
+
+<!-- ─── BACKTESTING ─── -->
+<h2 class="section-title" id="backtesting">
+    <i class="fas fa-flask"></i> Tab 2: Backtesting Engine — Would You Fly an Untested Plane?
+</h2>
+
+<div class="card">
+    <p>
+        The second tab of the Smart Trading Center is the <strong>Historical Backtesting Engine</strong>.
+        It takes the exact same signal strategies the scanner uses in real-time and replays them
+        against historical market data — giving you a scientific answer to the question:
+        <em>"How would this strategy have performed in the past?"</em>
+    </p>
+
+    <div class="danger-box">
+        <i class="fas fa-exclamation-circle"></i>
+        <p>
+            <strong>The most expensive mistake a trader can make</strong> is deploying real capital on
+            a strategy they've never tested. Backtesting costs you nothing. Skipping it could cost
+            you everything.
+        </p>
+    </div>
+
+    <h3 id="backtest-howto">📋 Step-by-Step: How to Run a Backtest</h3>
+
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+                <div class="step-title">Load Market Data First</div>
+                <p>Go back to the main scanner and click <strong>🔄 Refresh Data</strong>. The backtester uses this live data as the starting point for its simulation. Without data, the engine cannot run.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+                <div class="step-title">Choose a Preset Scenario (or go Custom)</div>
+                <p>Select from the dropdown — Swing Trade, Quick Scalp, Trend Hunter, or Conservative Safe. The fields populate automatically. Or set your own Capital, Trade Size, Stop Loss, Take Profit, Strategy, and Market Trend.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+                <div class="step-title">Optionally Enable Trailing Stop</div>
+                <p>Check the <strong>Trailing Stop</strong> checkbox. This moves the stop loss upward as the trade profits, locking in gains. Most effective in trending markets — test with and without it.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">
+                <div class="step-title">Click 🚀 Run Backtest</div>
+                <p>The engine runs in a background thread — the UI stays fully responsive. Each simulated trade appears in the left table. The right console shows win rate, net P&L, and key statistics in real-time.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-body">
+                <div class="step-title">Analyze & Iterate</div>
+                <p>Look for strategies with a win rate above 50% <em>and</em> a positive expectancy. Change one variable at a time. The goal is to find parameters that are consistently profitable across different market conditions.</p>
+            </div>
+        </div>
+    </div>
+
+    <h3>Example Backtest Results</h3>
+
+    <div class="backtest-result">
+        <div class="bt-header">
+            <div class="bt-title">🌟 Scenario: Swing Trade (1:3 R/R) — Advanced Strategy — Bullish Market</div>
+            <div class="bt-badge">15 Simulated Trades</div>
+        </div>
+        <div class="bt-metrics">
+            <div class="bt-metric"><div class="bt-val win">66.7%</div><div class="bt-lbl">Win Rate</div></div>
+            <div class="bt-metric"><div class="bt-val win">+$284</div><div class="bt-lbl">Net P&L</div></div>
+            <div class="bt-metric"><div class="bt-val neutral">-$92</div><div class="bt-lbl">Max Drawdown</div></div>
+            <div class="bt-metric"><div class="bt-val win">1:3</div><div class="bt-lbl">Risk/Reward</div></div>
+            <div class="bt-metric"><div class="bt-val win">$18.9</div><div class="bt-lbl">Avg Profit/Trade</div></div>
+        </div>
+    </div>
+
+    <div class="backtest-result">
+        <div class="bt-header">
+            <div class="bt-title">⚡ Scenario: Quick Scalp — Advanced + Trailing Stop — Neutral Market</div>
+            <div class="bt-badge">15 Simulated Trades</div>
+        </div>
+        <div class="bt-metrics">
+            <div class="bt-metric"><div class="bt-val win">53.3%</div><div class="bt-lbl">Win Rate</div></div>
+            <div class="bt-metric"><div class="bt-val win">+$41</div><div class="bt-lbl">Net P&L</div></div>
+            <div class="bt-metric"><div class="bt-val loss">-$156</div><div class="bt-lbl">Max Drawdown</div></div>
+            <div class="bt-metric"><div class="bt-val neutral">1:2</div><div class="bt-lbl">Risk/Reward</div></div>
+            <div class="bt-metric"><div class="bt-val neutral">$2.7</div><div class="bt-lbl">Avg Profit/Trade</div></div>
+        </div>
+    </div>
+
+    <div class="warning-box">
+        <i class="fas fa-lightbulb"></i>
+        <p>
+            <strong>Notice:</strong> The Swing Trade scenario produced 7× more profit despite a similar win rate.
+            This is the power of a good Risk/Reward ratio. Even with only 33% wins, the Swing Trade would still be break-even.
+            The Scalp requires a higher win rate to compensate for smaller targets.
+        </p>
+    </div>
+
+    <h3>Backtesting Parameters Guide</h3>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Parameter</th><th>What It Controls</th><th>Conservative</th><th>Aggressive</th></tr></thead>
+        <tbody>
+            <tr><td><strong>Capital ($)</strong></td><td>Starting portfolio size for P&L calculation</td><td>$1,000</td><td>$10,000</td></tr>
+            <tr><td><strong>Trade Size ($)</strong></td><td>Amount committed per trade</td><td>$20–50</td><td>$200–500</td></tr>
+            <tr><td><strong>Stop Loss (%)</strong></td><td>Distance from entry to hard stop</td><td>2–3%</td><td>8–12%</td></tr>
+            <tr><td><strong>Take Profit (%)</strong></td><td>Target profit to auto-close trade</td><td>4–6%</td><td>20–30%</td></tr>
+            <tr><td><strong>Strategy</strong></td><td>Signal generation algorithm</td><td>Composite</td><td>Momentum</td></tr>
+            <tr><td><strong>Market Trend</strong></td><td>Simulated market condition bias</td><td>Neutral</td><td>Bullish</td></tr>
+            <tr><td><strong>Trailing Stop</strong></td><td>Moves stop up as trade profits</td><td>Off</td><td>On</td></tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="highlight-box">
+        <p>💡 <strong>Golden Rule:</strong> Never deploy a strategy to real capital until it shows at least <strong>30 backtested trades</strong> with a positive expectancy. Fewer trades = statistical noise, not signal.</p>
+    </div>
+
+    <div class="urgency-banner" style="margin-top:1.5rem;">
+        <i class="fas fa-gem"></i>
+        <span>Premium users get the <strong>full backtesting engine</strong> with live data integration and unlimited simulation runs. Free tier has limited test sets. <a href="#premium" style="color:#fff;text-decoration:underline;">Upgrade Now →</a></span>
+    </div>
+</div>
+
+<!-- ─── AI WIN RATE ─── -->
+<h2 class="section-title" id="ai-prediction">
+    <i class="fas fa-brain"></i> AI Win Rate — See the Probability Before You Enter
+    <span class="section-badge"><i class="fas fa-lock"></i> VIP Only</span>
+</h2>
+
+<div class="card ai-border">
+    <p>
+        A <span class="signal-tag tag-strong-buy">⚡ Strong Buy</span> appears.
+        You're ready to enter. But what if you knew this pattern only wins <strong>32%</strong> of the time on this coin?
+        You'd skip it. That's exactly what AI Win Rate does — and it's available <strong>exclusively for VIP users</strong>.
+    </p>
+
+    <div class="ai-insight">
+        <div class="ai-badge"><i class="fas fa-microchip"></i> AI Analysis Active</div>
+        <p>
+            The model processes <strong>7 features</strong> per signal: RSI level, MACD histogram magnitude, 
+            volume ratio, market cap tier, bid-ask spread, day of week, and BTC 24h trend.
+            It returns a win probability calibrated to <strong>actual historical outcomes</strong> — not theoretical back-of-envelope math.
+        </p>
+    </div>
+
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>Coin</th><th>Signal</th><th>Risk</th><th>Free User</th><th>VIP User</th><th>Recommended Action</th></tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><strong>BTC/USDT</strong></td>
+                <td><span class="signal-tag tag-strong-buy">Strong Buy</span></td>
+                <td><span class="risk-pill risk-low">Low</span></td>
+                <td>🔒 VIP</td>
+                <td style="color:#059669;font-weight:800;">🔥 88%</td>
+                <td>Enter with full position size</td>
+            </tr>
+            <tr>
+                <td><strong>SOL/USDT</strong></td>
+                <td><span class="signal-tag tag-buy">Buy Signal</span></td>
+                <td><span class="risk-pill risk-low">Low</span></td>
+                <td>🔒 VIP</td>
+                <td style="color:#38a169;font-weight:800;">🟢 72%</td>
+                <td>Strong setup — enter with confidence</td>
+            </tr>
+            <tr>
+                <td><strong>XRP/USDT</strong></td>
+                <td><span class="signal-tag tag-buy">Buy Signal</span></td>
+                <td><span class="risk-pill risk-medium">Medium</span></td>
+                <td>🔒 VIP</td>
+                <td style="color:#38a169;font-weight:800;">📈 65%</td>
+                <td>Enter with half position size</td>
+            </tr>
+            <tr>
+                <td><strong>SHIB/USDT</strong></td>
+                <td><span class="signal-tag tag-strong-buy">Strong Buy</span></td>
+                <td><span class="risk-pill risk-high">High</span></td>
+                <td>🔒 VIP</td>
+                <td style="color:var(--urgent);font-weight:800;">❌ 32%</td>
+                <td>Skip — poor historical odds on meme coins</td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+
+    <h3>How the Model is Trained</h3>
+    <ul>
+        <li>Historical signal outcomes across 2,000+ coins over 3 years of data</li>
+        <li>Features: RSI, MACD, volume ratio, market cap tier, spread, day of week, BTC trend</li>
+        <li>Model: Gradient Boosting (XGBoost) with walk-forward validation — <strong>zero lookahead bias</strong></li>
+        <li>Win Rate = % of similar historical setups that reached TP before SL</li>
+        <li>Updates quarterly as new market data is incorporated</li>
+    </ul>
+
+    <div class="urgency-banner">
+        <i class="fas fa-fire"></i>
+        For the cost of <em>one losing trade</em>, you can unlock a full year of precise probability estimates. <a href="#premium" style="color:#fff;text-decoration:underline;">See Pricing →</a>
+    </div>
+</div>
+
+<!-- ─── LEARNING ENGINE ─── -->
+<h2 class="section-title" id="learning-engine">
+    <i class="fas fa-microchip"></i> AI Trade Learner — The Coach That Never Forgets
+</h2>
+
+<div class="card">
+    <p>
+        CryptoScanner doesn't just give you signals — it <strong>learns from every trade you make</strong>.
+        The <code>TradeLearner</code> engine records each entry and exit, analyzes the market conditions at the time,
+        and builds automated rules to prevent you from repeating the same costly mistakes.
+    </p>
+    <p>Think of it as a world-class trading coach who was present for every single one of your trades and never forgets what went wrong.</p>
+
+    <div class="timeline">
+        <div class="timeline-item">
+            <div class="tl-title">📝 Trade Recorded</div>
+            <p>Every trade from Paper Trading and Real Bot — entry price, exit, signal type, RSI level, MACD, BTC trend, spread — is stored in a local JSON database.</p>
+        </div>
+        <div class="timeline-item">
+            <div class="tl-title">🔍 Pattern Detection</div>
+            <p>After 2+ similar losing trades, the <code>FailureAnalyzer</code> detects the pattern. Example: "Long signal fired when RSI > 72 and BTC was falling — loss both times."</p>
+        </div>
+        <div class="timeline-item">
+            <div class="tl-title">📏 Rule Creation</div>
+            <p>A protection rule is generated automatically: "Block long signals when RSI > 72 AND BTC 24h change is negative." Confidence level is calculated based on sample size.</p>
+        </div>
+        <div class="timeline-item">
+            <div class="tl-title">🛡️ Signal Validation</div>
+            <p>Every new signal from the scanner passes through the rule engine before reaching the Paper Trader or Bot. Low-confidence signals are blocked or flagged with a visible warning.</p>
+        </div>
+        <div class="timeline-item">
+            <div class="tl-title">⏱️ Adaptive Expiry</div>
+            <p>Rules expire after 30 days if not triggered again — preventing outdated rules from blocking valid setups in new market conditions.</p>
+        </div>
+    </div>
+
+    <h3>Learning Dashboard Features</h3>
+    <ul>
+        <li><strong>Worst Symbols Panel:</strong> Shows which coins consistently cause losses for you specifically — not statistically for everyone.</li>
+        <li><strong>Long/Short Separation:</strong> A losing long pattern does NOT block short setups. Context always matters.</li>
+        <li><strong>Confidence Score:</strong> Every blocked signal gets a learner confidence score (0–100). Below 50 = warning in UI.</li>
+        <li><strong>Rule Inspector:</strong> View, edit, or delete any rule from the Learning Dashboard. Full transparency.</li>
+        <li><strong>Win Rate Improvement Tracking:</strong> See your personal win rate before and after the AI started blocking signals.</li>
+        <li><strong>100% Local Privacy:</strong> All data stored in a local JSON file. Never uploaded. Never shared.</li>
+    </ul>
+
+    <div class="warning-box">
+        <i class="fas fa-quote-left"></i>
+        <p><em>"This feature alone has saved early users thousands of dollars by blocking impulsive entries during unfavorable conditions that their personal history showed were dangerous."</em></p>
+    </div>
+</div>
+
+<!-- ─── LOSS LESSONS ─── -->
+<h2 class="section-title" id="loss-lessons">
+    <i class="fas fa-graduation-cap"></i> Learning From Losses — Turn Pain Into Profit
+</h2>
+
+<div class="card accent-border">
+    <p>
+        A losing trade is tuition. The question is: <strong>are you extracting the lesson?</strong>
+        Most traders swallow the loss, tell themselves "I'll be more careful next time," and repeat the exact same mistake three weeks later.
+        CryptoScanner makes sure that never happens.
+    </p>
+
+    <h3>🔴 The Most Common Losing Patterns (and How the AI Catches Them)</h3>
+
+    <div class="lesson-card">
+        <div class="lesson-header">
+            <div class="lesson-icon"><i class="fas fa-arrow-trend-up"></i></div>
+            <div class="lesson-title">Pattern 1: Chasing Overbought Breakouts</div>
+        </div>
+        <p>
+            <strong>What happens:</strong> RSI > 75, price already up 20% in 24h, Strong Buy fires. FOMO drives entry. Price immediately reverses.
+            <br><strong>What the AI learns:</strong> Block long signals when RSI > 75 AND 24h change > 15%.
+            <br><strong>Result:</strong> This category of trades historically hits Stop Loss 71% of the time. Blocked automatically after 2 occurrences.
+        </p>
+    </div>
+
+    <div class="lesson-card">
+        <div class="lesson-header">
+            <div class="lesson-icon"><i class="fas fa-coins"></i></div>
+            <div class="lesson-title">Pattern 2: Low-Cap Meme Coin Traps</div>
+        </div>
+        <p>
+            <strong>What happens:</strong> High volume spike + Buy Signal on a $10M market cap meme coin. Entry filled. Volume disappears. Price dumps 15%.
+            <br><strong>What the AI learns:</strong> Flag all signals on coins with market cap under $50M and Risk level = High or Extreme.
+            <br><strong>Result:</strong> Win rate on this coin class was 24%. The block saves real capital.
+        </p>
+    </div>
+
+    <div class="lesson-card">
+        <div class="lesson-header">
+            <div class="lesson-icon"><i class="fas fa-bitcoin"></i></div>
+            <div class="lesson-title">Pattern 3: Buying During BTC Corrections</div>
+        </div>
+        <p>
+            <strong>What happens:</strong> BTC drops 4% in 24h. Altcoin signal fires. Entry made. BTC continues falling, drags everything down.
+            <br><strong>What the AI learns:</strong> Reduce confidence score for all long signals when BTC 24h change is below −3%.
+            <br><strong>Result:</strong> Historical win rate in this condition: 31% vs 68% in neutral/bullish BTC conditions. Major filter.
+        </p>
+    </div>
+
+    <div class="lesson-card">
+        <div class="lesson-header">
+            <div class="lesson-icon"><i class="fas fa-clock"></i></div>
+            <div class="lesson-title">Pattern 4: Ignoring the Stop Loss</div>
+        </div>
+        <p>
+            <strong>What happens:</strong> Trade hits SL, trader overrides it manually ("it will bounce"). Loss compounds from −2% to −18%.
+            <br><strong>What the AI learns:</strong> N/A — the AI cannot override a human decision. But Paper Trading shows the cost: every manual override costs an average of 8× the original SL size.
+            <br><strong>The lesson:</strong> The Stop Loss is not a suggestion. It is the contract you made with yourself before emotion entered the room.
+        </p>
+    </div>
+
+    <div class="lesson-card lesson-success">
+        <div class="lesson-header">
+            <div class="lesson-icon"><i class="fas fa-trophy"></i></div>
+            <div class="lesson-title">✅ What Good Trades Look Like</div>
+        </div>
+        <p>
+            RSI between 40–60, BTC flat or rising, 24h volume ratio > 1.5×, signal is "Buy Signal" (not chasing "Strong Buy" after a pump),
+            Risk level is Low or Medium, AI confidence score > 70%, market trend is Neutral or Bullish.
+            <br><strong>Historical win rate in this combination:</strong> 73%. This is the setup to wait for.
+        </p>
+    </div>
+
+    <div class="info-box">
+        <i class="fas fa-lightbulb"></i>
+        <p>
+            <strong>Open the Learning Dashboard</strong> (in the main scanner menu) to see a personalized breakdown of your own specific loss patterns.
+            Unlike generic advice, this is calibrated to <em>your actual trade history</em>.
+            The more Paper Trades you log, the more precise and personalized the AI becomes.
+        </p>
+    </div>
+
+    <div class="highlight-box">
+        <p>🎓 <strong>The Compound Effect of Learning:</strong> Eliminating just 3 bad patterns can improve your win rate from 45% to 65%.
+        On a 1:2 R/R strategy with $100 per trade over 100 trades, that difference is worth <strong>+$1,400 in net profit</strong>.</p>
+    </div>
+
+    <div class="urgency-banner" style="margin-top:1.5rem;">
+        <i class="fas fa-rocket"></i>
+        <span>The full AI Learning engine is available on the free tier. But only Premium users can <strong>combine it with the Live Bot</strong> to automatically block trades in real-time. <a href="#premium" style="color:#fff;text-decoration:underline;">Go Premium →</a></span>
+    </div>
+</div>
+
+<!-- ─── SIGNAL ENGINE ─── -->
+<h2 class="section-title" id="signal-engine">
+    <i class="fas fa-wave-square"></i> 6 Trading Strategies — Find Your Edge
+</h2>
+
+<div class="card">
+    <p>
+        The scanner applies a <strong>multi-strategy scoring engine</strong> that adapts to market conditions.
+        Each strategy is a weighted sum of independent indicators. The final score maps to a clear, actionable signal.
+    </p>
+
+    <h3 id="scoring-system">How the Scoring System Works</h3>
+
+    <div style="margin:1.2rem 0;">
+        <div class="score-row"><div class="score-label">RSI Oversold</div><div class="score-bar-track"><div class="score-bar-fill" style="width:80%"></div></div><div class="score-val">+8</div></div>
+        <div class="score-row"><div class="score-label">MACD Crossover</div><div class="score-bar-track"><div class="score-bar-fill" style="width:60%"></div></div><div class="score-val">+6</div></div>
+        <div class="score-row"><div class="score-label">BB Lower Touch</div><div class="score-bar-track"><div class="score-bar-fill" style="width:50%"></div></div><div class="score-val">+5</div></div>
+        <div class="score-row"><div class="score-label">Volume Spike</div><div class="score-bar-track"><div class="score-bar-fill" style="width:40%"></div></div><div class="score-val">+4</div></div>
+        <div class="score-row"><div class="score-label">High Spread Penalty</div><div class="score-bar-track"><div class="score-bar-fill" style="width:20%;background:var(--urgent)"></div></div><div class="score-val" style="color:var(--urgent)">−2</div></div>
+    </div>
+
+    <div class="info-box">
+        <i class="fas fa-info-circle"></i>
+        <p>
+            Raw Score → <strong style="color:#065F46">Strong Buy (≥18)</strong> |
+            <strong style="color:#059669">Buy Signal (10–18)</strong> |
+            <strong style="color:#6B7280">Neutral</strong> |
+            <strong style="color:#D97706">Sell Signal (−10 to −18)</strong> |
+            <strong style="color:#991B1B">Strong Sell (≤−18)</strong>
+        </p>
+    </div>
+
+    <h3>The 6 Strategies</h3>
+    <div class="table-wrap">
+    <table>
+        <thead>
+            <tr><th>Strategy</th><th>Core Factors</th><th>Best Condition</th><th>Backtest With</th></tr>
+        </thead>
+        <tbody>
+            <tr><td><code>basic</code></td><td>Price momentum + Volume spike + RSI zones</td><td>Trending markets, beginners</td><td>Bullish trend, TP 6%, SL 3%</td></tr>
+            <tr><td><code>advanced</code></td><td>All indicators: MACD, RSI, Bollinger, Volume</td><td>Default for active traders</td><td>Neutral, TP 8%, SL 2.5%</td></tr>
+            <tr><td><code>momentum</code></td><td>Price momentum + Volume confirmation</td><td>Breakout hunting</td><td>Bullish, TP 12%, SL 4%</td></tr>
+            <tr><td><code>mean_reversion</code></td><td>Buy dips: high RSI/BB weight, negative price weight</td><td>Range-bound, low volatility</td><td>Neutral, TP 5%, SL 2%</td></tr>
+            <tr><td><code>volume_profile</code></td><td>Extreme volume + BB position zones</td><td>Altcoin spikes, unusual volume</td><td>Any, TP 10%, SL 3%</td></tr>
+            <tr><td><code>composite</code></td><td>Averages Advanced + Mean Reversion scores</td><td>Highest confidence, conservative</td><td>All conditions, TP 8%, SL 2%</td></tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="highlight-box">
+        <p>📂 The full engine is in <code>analysis/signals.py</code>. Add custom strategies with <code>register_strategy()</code> — no fork required. Backtest your custom strategy immediately after registering it.</p>
+    </div>
+</div>
+
+<!-- ─── RISK ENGINE ─── -->
+<h2 class="section-title" id="risk-engine">
+    <i class="fas fa-shield-alt"></i> 7-Layer Risk Engine — Never Blow Up Again
+</h2>
+
+<div class="card">
+    <p>Most traders only think about profit. Professionals obsess over risk. CryptoScanner's risk engine runs <strong>seven independent assessment layers</strong> on every coin, every scan:</p>
+
+    <ol>
+        <li><strong>Liquidity Risk</strong> — Market cap penalty + turnover ratio analysis. Low turnover = hard to exit.</li>
+        <li><strong>Market Risk</strong> — Market cap as a proxy for institutional support and price stability.</li>
+        <li><strong>Volatility Risk</strong> — ATR and historical volatility. High ATR relative to price = dangerous swings.</li>
+        <li><strong>Trend Risk</strong> — Momentum extremes, MACD histogram divergence, overextension detection.</li>
+        <li><strong>Technical Risk</strong> — RSI extreme zones (&gt;75 or &lt;25 trigger elevated risk).</li>
+        <li><strong>Volume Risk</strong> — Abnormal volume spikes relative to 20-period average (manipulation signals).</li>
+        <li><strong>Tag Risk</strong> — Automatic penalty for meme tokens, honeypots, and speculative assets.</li>
+    </ol>
+
+    <div class="grid-4" style="margin:1rem 0;">
+        <div class="stat-card"><div class="stat-num" style="color:var(--success)">0–3</div><div class="stat-label"><span class="risk-pill risk-low">Low Risk</span></div><p style="font-size:.82rem;margin:.5rem 0 0;">Favorable, liquidity confirmed</p></div>
+        <div class="stat-card"><div class="stat-num" style="color:var(--warning)">4–5</div><div class="stat-label"><span class="risk-pill risk-medium">Medium Risk</span></div><p style="font-size:.82rem;margin:.5rem 0 0;">Acceptable for most strategies</p></div>
+        <div class="stat-card"><div class="stat-num" style="color:var(--urgent)">6–7</div><div class="stat-label"><span class="risk-pill risk-high">High Risk</span></div><p style="font-size:.82rem;margin:.5rem 0 0;">Experienced traders only</p></div>
+        <div class="stat-card"><div class="stat-num" style="color:#FF4444">8–10</div><div class="stat-label"><span class="risk-pill risk-extreme">Extreme</span></div><p style="font-size:.82rem;margin:.5rem 0 0;">Auto-blocked by safety filter</p></div>
+    </div>
+
+    <div class="highlight-box">
+        <p>💡 A single avoided 10% loss on a $5,000 account saves $500 — more than a year of Premium subscription. The risk engine is your insurance policy.</p>
+    </div>
+</div>
+
+<!-- ─── INDICATORS ─── -->
+<h2 class="section-title" id="indicators">
+    <i class="fas fa-chart-area"></i> 20+ Technical Indicators — Built In, Free
+</h2>
+
+<div class="grid-3">
+    <div class="card" style="padding:1.2rem;">
+        <strong style="color:var(--primary)">Trend</strong>
+        <ul style="font-size:.88rem;margin:.6rem 0 0;">
+            <li>SMA (5, 10, 20, 50)</li>
+            <li>EMA (12, 26, 50)</li>
+            <li>MACD + Signal + Histogram</li>
+            <li>ADX + +DI / −DI</li>
+            <li>Pivot Points (Classic / Fib / Woodie)</li>
+        </ul>
+    </div>
+    <div class="card" style="padding:1.2rem;">
+        <strong style="color:var(--primary)">Momentum</strong>
+        <ul style="font-size:.88rem;margin:.6rem 0 0;">
+            <li>RSI (7, 14, 21)</li>
+            <li>Stochastic %K / %D</li>
+            <li>Williams %R</li>
+            <li>ROC (Rate of Change)</li>
+            <li>VWAP</li>
+        </ul>
+    </div>
+    <div class="card" style="padding:1.2rem;">
+        <strong style="color:var(--primary)">Volatility</strong>
+        <ul style="font-size:.88rem;margin:.6rem 0 0;">
+            <li>Bollinger Bands (Upper / Mid / Lower / Width)</li>
+            <li>ATR + ATR %</li>
+            <li>Pullback from ATH %</li>
+            <li>Historical Volatility</li>
+        </ul>
+    </div>
+    <div class="card" style="padding:1.2rem;">
+        <strong style="color:var(--primary)">Volume</strong>
+        <ul style="font-size:.88rem;margin:.6rem 0 0;">
+            <li>OBV (On-Balance Volume)</li>
+            <li>MFI (Money Flow Index)</li>
+            <li>Volume MA + Ratio</li>
+            <li>Turnover Ratio</li>
+        </ul>
+    </div>
+    <div class="card" style="padding:1.2rem;">
+        <strong style="color:var(--primary)">Advanced</strong>
+        <ul style="font-size:.88rem;margin:.6rem 0 0;">
+            <li>RSI / Price Divergence Detection</li>
+            <li>Support & Resistance Levels</li>
+            <li>Volume Profile Zones</li>
+            <li>Smart Money Accumulation</li>
+        </ul>
+    </div>
+    <div class="card" style="padding:1.2rem;">
+        <strong style="color:var(--primary)">TA-Lib Acceleration</strong>
+        <ul style="font-size:.88rem;margin:.6rem 0 0;">
+            <li>Auto-detected if installed</li>
+            <li>Falls back to pure Python</li>
+            <li>4× speed on 500-coin scans</li>
+            <li>Identical results either way</li>
+        </ul>
+    </div>
+</div>
+
+<!-- ─── DATA API ─── -->
+<h2 class="section-title" id="data-api">
+    <i class="fas fa-database"></i> Effortless Data Setup — Takes 2 Minutes
+</h2>
+
+<div class="card">
+    <div class="grid-2" style="margin:1.2rem 0;">
+        <div>
+            <h3><i class="fas fa-star" style="color:var(--gold)"></i> CoinMarketCap (Recommended)</h3>
+            <div class="steps">
+                <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Visit coinmarketcap.com/api</div><p>Free account, no credit card required.</p></div></div>
+                <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Generate API Key</div><p>30 seconds. Copy the key.</p></div></div>
+                <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Paste into Settings</div><p>Open CryptoScanner → Settings → API Key (CMC). Save.</p></div></div>
+            </div>
+        </div>
+        <div>
+            <h3><i class="fas fa-unlock" style="color:var(--success)"></i> CoinGecko (No Account Needed)</h3>
+            <div class="steps">
+                <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Visit coingecko.com/api</div><p>Use demo key or generate free key.</p></div></div>
+                <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Switch Source in Settings</div><p>Select CoinGecko. Up to 250 coins per scan.</p></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Feature</th><th>CoinGecko Free</th><th>CMC Free</th><th>CMC Pro</th></tr></thead>
+        <tbody>
+            <tr><td>Max Coins per Scan</td><td>250</td><td>500</td><td>5,000+</td></tr>
+            <tr><td>OHLCV History</td><td>✅ Up to 365 days</td><td>❌ Paid only</td><td>✅ Full</td></tr>
+            <tr><td>API Rate Limit</td><td>~30 calls/min</td><td>~30 calls/min</td><td>300+/min</td></tr>
+            <tr><td>Account Required</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+            <tr><td>Cost</td><td>Free</td><td>Free</td><td>$79/mo</td></tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<!-- ─── BOT AUTOMATION ─── -->
+<h2 class="section-title" id="automation">
+    <i class="fas fa-robot"></i> Tab 3: SmartEagle Bot — Hands-Free, Emotion-Free Trading
+</h2>
+
+<div class="card">
+    <p>Once your Paper Trading proves your strategy is profitable and your Backtest validates it historically, you are ready for Tab 3: the <strong>Real Auto-Trader</strong>. This is where virtual profits become real ones.</p>
+
+    <div class="danger-box">
+        <i class="fas fa-exclamation-triangle"></i>
+        <p>
+            <strong>The Three-Tab Rule:</strong> Do NOT open the Real Bot tab until you have:
+            ① At least 30 profitable paper trades logged, ② A completed backtest showing positive expectancy,
+            ③ Reviewed your loss patterns in the Learning Dashboard.
+            The sequence exists to protect you — follow it.
+        </p>
+    </div>
+
+    <div class="grid-2" style="margin:1rem 0;">
+        <div class="feature-card" style="margin:0;">
+            <div class="fc-icon"><i class="fas fa-mouse-pointer"></i></div>
+            <h3>1-Click Trade Execution</h3>
+            <p>Click <strong>SEND</strong> on any signal row to instantly open a properly-sized position with stop loss and take profit. Zero manual calculation.</p>
+        </div>
+        <div class="feature-card" style="margin:0;">
+            <div class="fc-icon"><i class="fas fa-sync-alt"></i></div>
+            <h3>Full Auto-Trade Mode</h3>
+            <p>The bot scans all configured pairs every 60 seconds and opens positions automatically when signals fire. Completely hands-free.</p>
+        </div>
+        <div class="feature-card" style="margin:0;">
+            <div class="fc-icon"><i class="fas fa-sliders-h"></i></div>
+            <h3>Trailing Stop Loss</h3>
+            <p>Once profit exceeds your threshold, the stop loss trails upward — locking in gains as the trade runs further.</p>
+        </div>
+        <div class="feature-card" style="margin:0;">
+            <div class="fc-icon"><i class="fas fa-stop-circle"></i></div>
+            <h3>Daily Drawdown Circuit Breaker</h3>
+            <p>If daily loss exceeds your configured maximum, the bot stops for the day. Protects from cascading losses and emotional tilt.</p>
+        </div>
+    </div>
+
+    <h3 id="bot-settings">Bot Configuration Reference</h3>
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Setting</th><th>Range</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+            <tr><td>Risk per trade %</td><td>0.1% – 10%</td><td>1.0%</td><td>Portfolio % risked per position</td></tr>
+            <tr><td>Stop Loss %</td><td>0.5% – 20%</td><td>2.0%</td><td>Distance from entry to hard stop</td></tr>
+            <tr><td>Take Profit %</td><td>1% – 50%</td><td>4.0%</td><td>Target profit to auto-close</td></tr>
+            <tr><td>Max open positions</td><td>1 – 20</td><td>5</td><td>Concurrent open trades limit</td></tr>
+            <tr><td>Max daily loss %</td><td>1% – 30%</td><td>10.0%</td><td>Daily circuit breaker threshold</td></tr>
+            <tr><td>Trailing stop</td><td>On / Off</td><td>Off</td><td>Move stop up as price rises</td></tr>
+            <tr><td>AI-enhanced signals</td><td>On / Off</td><td>Off</td><td>Only trade high Win Rate setups (VIP)</td></tr>
+            <tr><td>Testnet mode</td><td>On / Off</td><td>On</td><td>Trade on exchange sandbox first</td></tr>
+        </tbody>
+    </table>
+    </div>
+
+    <div class="info-box">
+        <i class="fas fa-plug"></i>
+        <p>Supported exchanges via CCXT: <strong>Binance, Bybit, OKX, KuCoin, Toobit, Gate.io, Bitget</strong> and 50+ more.</p>
+    </div>
+</div>
+
+<!-- ─── TOOLKIT ─── -->
+<h2 class="section-title" id="toolkit">
+    <i class="fas fa-toolbox"></i> Complete Professional Toolkit
+</h2>
+
+<div class="grid-3">
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-sticky-note"></i></div>
+        <h3>Trading Journal</h3>
+        <p>Built-in notes with automatic timestamps. Attach coin context, tag observations, and review your mindset history.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-chart-line"></i></div>
+        <h3>Interactive Charts</h3>
+        <p>Click any coin to plot price + RSI instantly with Matplotlib. Visualize divergences and pullbacks without leaving the app.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-file-excel"></i></div>
+        <h3>Excel / CSV Export</h3>
+        <p>Export filtered results or paper trade history to Excel/CSV for deeper analysis, tax records, or sharing.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-filter"></i></div>
+        <h3>Advanced Filters</h3>
+        <p>Filter by category (DeFi, AI, Meme, Layer-2), signal type, risk level, or coin name. One click to your exact setup.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-tv"></i></div>
+        <h3>TradingView Links</h3>
+        <p>One-click TradingView integration for any coin. Full chart analysis without switching windows.</p>
+    </div>
+    <div class="feature-card">
+        <div class="fc-icon"><i class="fas fa-history"></i></div>
+        <h3>Performance Tracker</h3>
+        <p>Win rate, average PnL, best/worst trades, open positions — all at a glance in the Smart Trading Center.</p>
+    </div>
+</div>
+
+<!-- ─── INSTALLATION ─── -->
+<h2 class="section-title" id="installation">
+    <i class="fas fa-download"></i> Installation — Up and Running in 3 Minutes
+</h2>
+
+<div class="card">
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">
+                <div class="step-title">Download CryptoScanner</div>
+                <p>Get the latest <code>.exe</code> (Windows) or <code>.zip</code> (source). Link provided after trial signup via WhatsApp.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">
+                <div class="step-title">Run & Configure API</div>
+                <p>Launch the app → Settings → paste your free CoinGecko or CMC API key. 60 seconds.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">
+                <div class="step-title">Click Refresh → See Signals</div>
+                <p>250–500 coins appear in 5–10 seconds with signals, risk scores, and full technicals.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">
+                <div class="step-title">Open Smart Trading Center → Tab 1</div>
+                <p>Set your Paper TP/SL. Watch the system simulate trades live. Build your track record before risking real capital.</p>
+            </div>
+        </div>
+        <div class="step">
+            <div class="step-num">5</div>
+            <div class="step-body">
+                <div class="step-title">Activate Premium When Ready</div>
+                <p>Your 7-day free trial starts automatically. Upgrade anytime — instant on-chain activation.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-wrap">
+    <table>
+        <thead><tr><th>Component</th><th>Minimum</th><th>Recommended</th></tr></thead>
+        <tbody>
+            <tr><td>OS</td><td>Windows 10 / macOS 11 / Ubuntu 20.04</td><td>Windows 11 / macOS 14</td></tr>
+            <tr><td>Python</td><td>3.10+</td><td>3.12+</td></tr>
+            <tr><td>RAM</td><td>4 GB</td><td>8 GB</td></tr>
+            <tr><td>Storage</td><td>500 MB</td><td>2 GB (for OHLCV cache)</td></tr>
+        </tbody>
+    </table>
+    </div>
+</div>
+
+<!-- ─── ROI CALCULATOR ─── -->
+<h2 class="section-title" id="roi">
+    <i class="fas fa-coins"></i> The Real Cost of NOT Using CryptoScanner
+</h2>
+
+<div class="roi-calc">
+    <h3><i class="fas fa-calculator"></i> Annual ROI Calculation</h3>
+    <div class="roi-row">
+        <span>Average losing trade without a system (typical retail)</span>
+        <span style="color:var(--urgent)">−$85 per trade</span>
+    </div>
+    <div class="roi-row">
+        <span>Average trades per month (active retail trader)</span>
+        <span>20 trades</span>
+    </div>
+    <div class="roi-row">
+        <span>Estimated annual loss from bad patterns</span>
+        <span style="color:var(--urgent)">−$1,020/year</span>
+    </div>
+    <div class="roi-row">
+        <span>Patterns blocked by AI (estimated 40% reduction)</span>
+        <span style="color:var(--success)">+$408 saved/year</span>
+    </div>
+    <div class="roi-row">
+        <span>Backtest-validated strategy improvement (est. +15% win rate)</span>
+        <span style="color:var(--success)">+$612 additional/year</span>
+    </div>
+    <div class="roi-row">
+        <span>Annual Premium cost (3-month plan × 4)</span>
+        <span style="color:var(--urgent)">−$112/year</span>
+    </div>
+    <div class="roi-row">
+        <span><strong>Estimated Net Annual Benefit</strong></span>
+        <span>+$908/year</span>
+    </div>
+</div>
+
+<div class="info-box">
+    <i class="fas fa-info-circle"></i>
+    <p>These estimates are conservative and based on typical retail trader behavior. Individual results vary. The purpose of the calculation is to illustrate that <strong>the cost of the tool is a fraction of the cost of trading without it.</strong></p>
+</div>
+
+<!-- ─── CTA MIDDLE ─── -->
+<div class="cta-section">
+    <h2><i class="fas fa-clock"></i> The Market Won't Wait</h2>
+    <p>Every minute you trade without a systematic edge, you are leaking money. Download CryptoScanner and start trading with the precision of a hedge fund.</p>
+    <div class="btn-group">
+        <a href="#premium" class="btn btn-gold" style="font-size:1.05rem;padding:16px 40px;">
+            <i class="fas fa-rocket"></i> Start 7-Day Free Trial
+        </a>
+        <a href="https://wa.me/989160684552" class="btn btn-outline" style="color:#fff;border-color:rgba(255,255,255,.4);" target="_blank" rel="noopener">
+            <i class="fab fa-whatsapp"></i> Ask a Question
+        </a>
+    </div>
+    <p style="margin-top:1rem;font-size:.9rem;">No credit card. No account. Instant download.</p>
+</div>
+
+<!-- ─── FREE vs PREMIUM ─── -->
+<h2 class="section-title" id="premium">
+    <i class="fas fa-gem"></i> Free vs Premium — Every Feature Compared
+</h2>
+
+<div class="table-wrap">
+<table class="compare-table">
+    <thead>
+        <tr>
+            <th>Feature</th>
+            <th style="text-align:center">Free (7-Day Trial)</th>
+            <th style="text-align:center;color:var(--gold-dark)">⭐ Premium</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr><td>Daily scan limit</td><td style="text-align:center">3 refreshes/day</td><td style="text-align:center" class="check">Unlimited</td></tr>
+        <tr><td>Number of coins</td><td style="text-align:center">250</td><td style="text-align:center" class="check">500+</td></tr>
+        <tr><td>All 6 strategies</td><td style="text-align:center" class="check">✓</td><td style="text-align:center" class="check">✓</td></tr>
+        <tr><td>20+ Indicators</td><td style="text-align:center" class="check">✓</td><td style="text-align:center" class="check">✓</td></tr>
+        <tr><td>Risk Assessment</td><td style="text-align:center" class="check">✓</td><td style="text-align:center" class="check">✓</td></tr>
+        <tr><td>Paper Trading + Custom TP/SL</td><td style="text-align:center" class="check">✓</td><td style="text-align:center" class="check">✓ Enhanced</td></tr>
+        <tr><td>Backtesting Engine</td><td style="text-align:center">Limited scenarios</td><td style="text-align:center" class="check">✓ Full + Live Data</td></tr>
+        <tr><td>AI Trade Learner</td><td style="text-align:center" class="check">✓</td><td style="text-align:center" class="check">✓</td></tr>
+        <tr><td>Loss Pattern Dashboard</td><td style="text-align:center" class="check">✓</td><td style="text-align:center" class="check">✓</td></tr>
+        <tr><td>AI Win Rate column</td><td style="text-align:center" class="cross">🔒 Locked</td><td style="text-align:center" class="gold-check">⭐ Unlocked</td></tr>
+        <tr><td>Real Bot automation</td><td style="text-align:center">7-day trial only</td><td style="text-align:center" class="gold-check">⭐ Unlimited</td></tr>
+        <tr><td>AI-filtered bot signals</td><td style="text-align:center" class="cross">🔒 Locked</td><td style="text-align:center" class="gold-check">⭐ Unlocked</td></tr>
+        <tr><td>Priority WhatsApp support</td><td style="text-align:center" class="cross">❌</td><td style="text-align:center" class="gold-check">⭐ Yes</td></tr>
+        <tr><td>Early feature access (v7.0)</td><td style="text-align:center" class="cross">❌</td><td style="text-align:center" class="gold-check">⭐ Yes</td></tr>
+    </tbody>
+</table>
+</div>
+
+<div class="price-cards">
+    <div class="price-card">
+        <div class="plan-name">1 Month</div>
+        <div class="plan-price">10 <span>USDT</span></div>
+        <ul>
+            <li>All Premium features</li>
+            <li>Bot automation</li>
+            <li>AI Win Rate</li>
+            <li>Full backtesting</li>
+            <li>Unlimited scans</li>
+        </ul>
+        <a href="https://wa.me/989160684552" class="btn btn-outline" style="width:100%;justify-content:center;">Get Started</a>
+    </div>
+
+    <div class="price-card featured">
+        <span class="plan-badge">🔥 Most Popular</span>
+        <div class="plan-name">3 Months</div>
+        <div class="plan-price">28 <span>USDT</span></div>
+        <p style="font-size:.8rem;color:var(--success);font-weight:700;margin:.2rem 0 .8rem;">Save 7% vs monthly</p>
+        <ul>
+            <li>All Premium features</li>
+            <li>Bot automation</li>
+            <li>AI Win Rate</li>
+            <li>Full backtesting</li>
+            <li>Unlimited scans</li>
+            <li>Priority support</li>
+        </ul>
+        <a href="https://wa.me/989160684552" class="btn btn-gold" style="width:100%;justify-content:center;">Get 3 Months</a>
+    </div>
+
+    <div class="price-card">
+        <span class="plan-badge" style="background:var(--primary)">⭐ Best Value</span>
+        <div class="plan-name">12 Months</div>
+        <div class="plan-price">100 <span>USDT</span></div>
+        <p style="font-size:.8rem;color:var(--success);font-weight:700;margin:.2rem 0 .8rem;">Save 17% vs monthly</p>
+        <ul>
+            <li>All Premium features</li>
+            <li>Bot automation</li>
+            <li>AI Win Rate</li>
+            <li>Full backtesting</li>
+            <li>Unlimited scans</li>
+            <li>Priority support</li>
+            <li>Early access to v7.0</li>
+        </ul>
+        <a href="https://wa.me/989160684552" class="btn btn-primary" style="width:100%;justify-content:center;">Get 12 Months</a>
+    </div>
+</div>
+
+<div class="card gold-border" style="margin-top:2rem;">
+    <h3 style="color:var(--gold-dark);margin-top:0;"><i class="fas fa-qrcode"></i> Instant Decentralized Activation</h3>
+    <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Click ⭐ Premium in the app</div><p>QR code and USDT TRC20 wallet address appear instantly.</p></div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Send exact USDT amount (TRC20)</div><p>Use Trust Wallet, Binance, OKX, or any TRC20-compatible wallet. ±1 USDT tolerance. Within 48 hours.</p></div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Paste the transaction hash</div><p>Copy the TX hash from your wallet or TronScan and paste it into the app.</p></div></div>
+        <div class="step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Click Check — Activated in seconds</div><p>On-chain verifier confirms payment. Premium activates immediately. Bound to your device. No personal info collected.</p></div></div>
+    </div>
+    <div class="info-box">
+        <i class="fas fa-shield-alt"></i>
+        <p><strong>Privacy-first activation:</strong> No email. No account. No KYC. Cryptographically bound to your device ID. Completely anonymous.</p>
+    </div>
+</div>
+
+<!-- ─── TESTIMONIALS ─── -->
+<h2 class="section-title">
+    <i class="fas fa-users"></i> What Traders Are Saying
+</h2>
+
+<div class="grid-2">
+    <div class="testimonial">
+        <p>The Paper Trading tab finally made me understand my real win rate. I thought I was at 60% — turns out I was at 38%. The AI caught patterns I didn't even know I had. Fixed them in 2 weeks.</p>
+        <div class="author">Ahmad R.</div>
+        <div class="author-role">Full-time Crypto Trader • Dubai</div>
+    </div>
+    <div class="testimonial">
+        <p>I ran 3 backtests before going live with the bot. The third one — Composite strategy, 1:3 R/R — showed 71% win rate over 30 simulated trades. That gave me the confidence to actually commit. Bot is now running 24/7.</p>
+        <div class="author">Maria S.</div>
+        <div class="author-role">Software Engineer & Part-Time Trader • London</div>
+    </div>
+    <div class="testimonial">
+        <p>The Learning Dashboard showed me I was consistently losing when RSI was above 70. I had no idea. That single insight saved me from 6 bad trades in the next month. Worth 10× the subscription cost.</p>
+        <div class="author">Kenji T.</div>
+        <div class="author-role">Retail Trader • Tokyo</div>
+    </div>
+    <div class="testimonial">
+        <p>The bot ran overnight and hit a +6% take profit on ETH while I slept. The risk engine blocked 2 High-Risk signals that would have been disasters. Woke up profitable, stress-free. This changes everything.</p>
+        <div class="author">Layla M.</div>
+        <div class="author-role">Quantitative Trader • Beirut</div>
+    </div>
+</div>
+
+<!-- ─── FAQ ─── -->
+<h2 class="section-title" id="faq">
+    <i class="fas fa-question-circle"></i> Frequently Asked Questions
+</h2>
+
+<div class="card">
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> What is the difference between Paper Trading and Backtesting?</div>
+        <div class="faq-a">
+            <strong>Paper Trading (Tab 1)</strong> runs forward in time using live market data. It opens virtual trades when signals fire <em>right now</em> and tracks them in real-time. <strong>Backtesting (Tab 2)</strong> runs backward in time, replaying your strategy against historical data. Use backtesting to validate a strategy, then use paper trading to confirm it works in current market conditions before going live with real money.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> How do I change the TP and SL for Paper Trading?</div>
+        <div class="faq-a">
+            In the Smart Trading Center (📊 button in the main toolbar), go to <strong>Tab 1: Paper Trading</strong>. At the top, you will see the <strong>Paper Trade Settings bar</strong> with three fields: Trade Size ($), Take Profit (%), and Stop Loss (%). Change the values and click <strong>Apply PnL</strong> to instantly recalculate all current open trades under the new parameters.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> How many paper trades should I run before going live?</div>
+        <div class="faq-a">
+            A minimum of <strong>30 completed trades</strong> is recommended for statistical significance. Below 20, win rate estimates are unreliable noise. Above 50 gives you a very solid picture of whether your chosen TP/SL scenario is profitable with the current signal strategy.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> What does the AI Trade Learner actually block?</div>
+        <div class="faq-a">
+            The AI blocks (or flags with a warning) signals that match patterns from your personal loss history. For example, if you have lost money 3 times in a row when RSI > 72 during a BTC correction, the system will automatically block future signals in that exact condition. Rules are personalized to <em>your</em> trade history — not generic advice. All rules are visible and editable in the Learning Dashboard.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> Does the backtester use real historical data?</div>
+        <div class="faq-a">
+            When the full backtesting engine is installed (<code>backtesting/backtest.py</code>), it uses real OHLCV data fetched from your configured API source. If the engine module is missing, the simulator runs a Monte Carlo simulation based on your TP/SL parameters and a random seed — useful for understanding R/R math, but not for strategy validation. Premium users get full live-data backtesting.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> Can I use the bot in simulator mode before connecting to a real exchange?</div>
+        <div class="faq-a">
+            Yes. Set the exchange to <code>SIMULATOR</code> in the bot settings. The bot will go through all the motions — opening positions, tracking P&L, triggering stop losses and take profits — but no real orders are placed. Run simulator mode in parallel with your paper trading for at least 2 weeks before switching to a real exchange.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> Is my API key safe?</div>
+        <div class="faq-a">
+            Yes. API keys are encrypted with Fernet (AES-128) and stored locally on your machine. They are never transmitted to any server. Your exchange credentials are protected with industry-standard encryption.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> What happens to my Premium if I reinstall?</div>
+        <div class="faq-a">
+            Premium is bound to your device ID. If you change computers, contact us on WhatsApp with your transaction hash and we'll transfer your license within 24 hours. Always keep your TX hash as proof of payment.
+        </div>
+    </div>
+    <div class="faq-item">
+        <div class="faq-q"><i class="fas fa-chevron-right"></i> Can I write my own custom strategy?</div>
+        <div class="faq-a">
+            Yes. Open <code>analysis/signals.py</code> and call <code>register_strategy("my_strat", my_function)</code>. Your strategy receives a DataFrame row and returns a result dict. The software is fully extensible — and you can immediately backtest your custom strategy from Tab 2.
+        </div>
+    </div>
+</div>
+
+<!-- ─── SUPPORT ─── -->
+<h2 class="section-title" id="support">
+    <i class="fas fa-headset"></i> Real Human Support
+</h2>
+
+<div class="card accent-border">
+    <p>Questions about Paper Trading setup, backtesting parameters, AI Learning, bot configuration, or exchange connectivity? We respond directly on WhatsApp — no ticket queues, no bots, no 48-hour waits.</p>
+    <div class="btn-group">
+        <a href="https://wa.me/989160684552" class="btn btn-primary" target="_blank" rel="noopener">
+            <i class="fab fa-whatsapp"></i> Chat on WhatsApp: +98 916 068 4552
+        </a>
+    </div>
+    <p style="font-size:.9rem;margin-top:.5rem;">Typical response: <strong>&lt; 2 hours</strong> (UTC+3.5 business hours).</p>
+
+    <div class="grid-3" style="margin-top:1.2rem;">
+        <div style="font-size:.9rem;"><i class="fas fa-check" style="color:var(--success);margin-right:8px;"></i>API key setup</div>
+        <div style="font-size:.9rem;"><i class="fas fa-check" style="color:var(--success);margin-right:8px;"></i>Paper trading config</div>
+        <div style="font-size:.9rem;"><i class="fas fa-check" style="color:var(--success);margin-right:8px;"></i>Backtest interpretation</div>
+        <div style="font-size:.9rem;"><i class="fas fa-check" style="color:var(--success);margin-right:8px;"></i>Bot configuration review</div>
+        <div style="font-size:.9rem;"><i class="fas fa-check" style="color:var(--success);margin-right:8px;"></i>Premium activation</div>
+        <div style="font-size:.9rem;"><i class="fas fa-check" style="color:var(--success);margin-right:8px;"></i>License transfer requests</div>
+    </div>
+</div>
+
+<!-- ─── FINAL CTA ─── -->
+<div class="cta-section">
+    <h2><i class="fas fa-rocket"></i> Start Trading With an Edge — Today</h2>
+    <p>7-Day full trial. Paper Trade. Backtest. Let the AI learn your patterns. Then go live — with confidence.</p>
+    <div class="btn-group">
+        <a href="https://wa.me/989160684552" class="btn btn-gold" style="font-size:1.1rem;padding:16px 40px;" target="_blank" rel="noopener">
+            <i class="fab fa-whatsapp"></i> Get CryptoScanner via WhatsApp
+        </a>
+    </div>
+    <p style="margin-top:1.2rem;font-weight:600;">Join thousands of traders who stopped guessing and started winning systematically.</p>
+</div>
+
+<footer class="site-footer">
+    <p class="quote">"The market rewards discipline. It punishes hope. Choose your side."</p>
+    <p>© 2026 CryptoScanner v6.0 — Turquoise Edition. All rights reserved.</p>
+    <p>
+        <a href="https://wa.me/989160684552" target="_blank" rel="noopener" style="color:var(--primary);">
+            <i class="fab fa-whatsapp"></i> +98 916 068 4552
+        </a>
+    </p>
+</footer>
+
+</main>
+</div>
+
+<script>
+// ── Mobile sidebar ─────────────────────────────────────────
+const sidebar    = document.getElementById('sidebar');
+const menuToggle = document.getElementById('menu-toggle');
+const overlay    = document.createElement('div');
+overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:150;display:none;';
+document.body.appendChild(overlay);
+
+function openSidebar(){ sidebar.classList.add('open'); overlay.style.display='block'; menuToggle.innerHTML='<i class="fas fa-times"></i>'; }
+function closeSidebar(){ sidebar.classList.remove('open'); overlay.style.display='none'; menuToggle.innerHTML='<i class="fas fa-bars"></i>'; }
+menuToggle.addEventListener('click', () => sidebar.classList.contains('open') ? closeSidebar() : openSidebar());
+overlay.addEventListener('click', closeSidebar);
+document.querySelectorAll('.sidebar nav a').forEach(a => a.addEventListener('click', () => { if(window.innerWidth <= 960) closeSidebar(); }));
+
+// ── Active nav on scroll ───────────────────────────────────
+const sections = document.querySelectorAll('section[id], h2[id], div[id]');
+const navLinks  = document.querySelectorAll('.sidebar nav a');
+const observer  = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+        if(entry.isIntersecting){
+            navLinks.forEach(l => l.classList.remove('active'));
+            const link = document.querySelector(`.sidebar nav a[href="#${entry.target.id}"]`);
+            if(link) link.classList.add('active');
+        }
+    });
+}, { rootMargin:'-20% 0px -60% 0px' });
+sections.forEach(s => observer.observe(s));
+
+// ── FAQ accordion ─────────────────────────────────────────
+document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => {
+        const answer = q.nextElementSibling;
+        const icon   = q.querySelector('i');
+        const isOpen = answer.style.display === 'block';
+        document.querySelectorAll('.faq-a').forEach(a => { a.style.display='none'; });
+        document.querySelectorAll('.faq-q i').forEach(i => { i.style.transform=''; });
+        if(!isOpen){ answer.style.display='block'; icon.style.transform='rotate(90deg)'; }
+    });
+});
+
+// ── Smooth scroll ─────────────────────────────────────────
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+    a.addEventListener('click', e => {
+        const target = document.querySelector(a.getAttribute('href'));
+        if(!target) return;
+        e.preventDefault();
+        const offset = window.innerWidth <= 960 ? 72 : 24;
+        window.scrollTo({ top: target.getBoundingClientRect().top + window.scrollY - offset, behavior:'smooth' });
+    });
+});
+
+// ── Paper Trade Simulator ─────────────────────────────────
+function runSimulation() {
+    const size   = parseFloat(document.getElementById('sim-size').value)   || 100;
+    const tp     = parseFloat(document.getElementById('sim-tp').value)     || 6;
+    const sl     = parseFloat(document.getElementById('sim-sl').value)     || 2;
+    const wr     = parseFloat(document.getElementById('sim-wr').value)     || 60;
+    const trades = parseInt(document.getElementById('sim-trades').value)   || 20;
+
+    const winRate  = wr / 100;
+    const wins     = Math.round(trades * winRate);
+    const losses   = trades - wins;
+    const grossWin = wins   * size * (tp / 100);
+    const grossLoss= losses * size * (sl / 100);
+    const netPnl   = grossWin - grossLoss;
+    const rrRatio  = tp / sl;
+    const expectancy = (winRate * size * (tp/100)) - ((1-winRate) * size * (sl/100));
+
+    const pnlEl   = document.getElementById('res-pnl');
+    const winsEl  = document.getElementById('res-wins');
+    const lossEl  = document.getElementById('res-losses');
+    const rrEl    = document.getElementById('res-rr');
+    const expEl   = document.getElementById('res-expect');
+
+    const sign = netPnl >= 0 ? '+' : '';
+    pnlEl.textContent  = `${sign}$${netPnl.toFixed(2)}`;
+    pnlEl.className    = `sim-result-val ${netPnl >= 0 ? 'positive' : 'negative'}`;
+    winsEl.textContent = wins;
+    lossEl.textContent = losses;
+    rrEl.textContent   = rrRatio.toFixed(2);
+
+    const eSign = expectancy >= 0 ? '+' : '';
+    expEl.textContent  = `${eSign}$${expectancy.toFixed(2)}`;
+    expEl.style.color  = expectancy >= 0 ? '#34D399' : '#F87171';
+
+    // Animate results
+    const results = document.getElementById('sim-results');
+    results.style.opacity = '0';
+    results.style.transform = 'translateY(8px)';
+    setTimeout(() => {
+        results.style.transition = 'opacity .3s, transform .3s';
+        results.style.opacity = '1';
+        results.style.transform = 'translateY(0)';
+    }, 50);
+}
+
+// Run once on load with defaults
+document.addEventListener('DOMContentLoaded', runSimulation);
+
+// ── Number counter animation ──────────────────────────────
+const counters = document.querySelectorAll('.stat-num, .hero-stat .num');
+const countObserver = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+        if(entry.isIntersecting && !entry.target.dataset.animated){
+            entry.target.dataset.animated = 'true';
+            const text = entry.target.textContent;
+            const num  = parseFloat(text.replace(/[^0-9.]/g, ''));
+            if(!isNaN(num) && num > 0 && num < 10000){
+                let start = 0;
+                const duration = 800;
+                const step = num / (duration / 16);
+                const timer = setInterval(() => {
+                    start += step;
+                    if(start >= num){ start = num; clearInterval(timer); }
+                    const suffix = text.replace(/[\d.]/g, '');
+                    entry.target.textContent = (Number.isInteger(num) ? Math.floor(start) : start.toFixed(1)) + suffix;
+                }, 16);
+            }
+        }
+    });
+}, { threshold:.5 });
+counters.forEach(c => countObserver.observe(c));
+</script>
+</body>
+</html>

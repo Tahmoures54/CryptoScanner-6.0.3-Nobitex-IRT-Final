@@ -1,0 +1,99 @@
+CryptoScanner-6.0.3-Nobitex-IRT-Final:
+|   .env.example
+|   app_icon.ico
+|   binance_data_provider.py
+|   eagle.png
+|   main.py
+|   MEMORY.md
+|   paper_trading_panel.py
+|   premium_window.py
+|   README.md
+|   requirements.txt
+|   signal_tracker.py
+|   structure.txt
+|   te.py
+|   trading_ui_helpers.py
+|   UserGuide.html
+|   
++---analysis
+|       indicators.py
+|       indicators_integration.py
+|       risk.py
+|       signals.py
+|       __init__.py
+|       
++---api
+|       api_base.py
+|       api_binance.py
+|       api_coingecko.py
+|       api_coinmarketcap.py
+|       api_tronscan.py
+|       __init__.py
+|       
++---backtesting
+|       backtest.py
+|       __init__.py
+|       
++---core
+|       config.py
+|       encryption.py
+|       user_manager.py
+|       user_status.py
+|       utils.py
+|       __init__.py
+|       
++---data
+|       bot_config.json
+|       paper_trade_settings.json
+|       
++---gui
+|   |   gui_helpers.py
+|   |   gui_main.py
+|   |   gui_performance.py
+|   |   splash_screen.py
+|   |   trading_ui_helpers.py
+|   |   ui_factory.py
+|   |   ui_theme.py
+|   |   unified_trading_window.py
+|   |   __init__.py
+|   |   
+|   +---dialogs
+|   |       base_dialog.py
+|   |       components.py
+|   |       note_window.py
+|   |       premium_window.py
+|   |       settings_window.py
+|   |       __init__.py
+|   |       
+|   \---panels
+|           paper_trading_panel.py
+|           real_trading_panel.py
+|           __init__.py
+|           
++---secrets
+|       api_key.txt
+|       config.ini
+|       license_key.key
+|       
++---tests
+|       tests.py
+|       test_confidence.py
+|       test_indicators.py
+|       test_integration.py
+|       test_nobitex_irt.py
+|       test_signals.py
+|       test_signal_tracker.py
+|       test_signal_tracker_v442.py
+|       __init__.py
+|       
+\---trading
+        bot_config.py
+        exceptions.py
+        exchange_base.py
+        exchange_ccxt.py
+        exchange_simulator.py
+        nobitex_client.py
+        trader.py
+        utils.py
+        __init__.py
+        

@@ -1,0 +1,27 @@
+CryptoScanner 6.0.3 — Real Trading Data Flow
+
+REAL AUTO TRADING — GLOBAL LEAD / NOBITEX LOCAL LAG
+1. Nobitex /market/stats (IRT/Rial markets) -> live local market universe and order-book liquidity.
+2. CoinMarketCap listings -> global price, 1h momentum, volume and freshness intelligence.
+3. Live Nobitex USDT/IRT ask -> USD-to-IRT fair-value conversion.
+4. GlobalLeadEngine compares global fair IRT value vs the executable Nobitex Ask and applies spread, volume, freshness and local-momentum safety filters.
+5. Only confirmed Global Lead / Local Lag candidates are sent to the dedicated real SignalTracker.
+6. Real SignalTracker -> TradingBot -> Nobitex order API.
+7. Actual fill confirmation -> native exchange-side stop_market -> trailing replacement -> exit.
+
+IMPORTANT
+- CoinMarketCap is market intelligence only; it never receives orders.
+- Nobitex remains the sole execution venue.
+- Generic public/paper pump signals are NOT allowed to enter the Global Lead real execution path.
+- The Real Trading panel's legacy auto-signal queue is disabled when the global_lead_local_lag strategy is active to prevent duplicate live execution paths.
+
+PAPER / PUBLIC SCANNER
+- CoinGecko / CoinMarketCap / Binance/public scanner data remains informational for the main scanner.
+- It is not routed to the real executor.
+- Main-screen background paper auto-trading is disabled; Paper Trading is explicit/manual.
+
+LOGGING
+- [REAL][GLOBAL→NOBITEX] = global intelligence + local execution candidate
+- [REAL][NOBITEX] = live execution / monitoring
+- [PAPER] = paper workflow
+- [REAL][SAFETY] = protective-stop/emergency-exit event

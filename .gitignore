@@ -1,0 +1,83 @@
+# ============================================================
+# CryptoScanner - Git Ignore
+# ============================================================
+
+# Secrets / credentials
+secrets/
+.env
+.env.*
+!.env.example
+
+*.key
+*.pem
+*.p12
+*.pfx
+
+api_key.txt
+config.ini
+license_key.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Runtime / local state
+*.db
+*.sqlite
+*.sqlite3
+.cache/
+cache/
+
+# Local user data
+local/
+user_data/
+runtime/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# Build / packaging
+build/
+dist/
+*.spec
+
+# Test artifacts
+test-results/
+coverage.xml
+
+# Generated exports
+exports/
+reports/
+*.xlsx
+*.csv

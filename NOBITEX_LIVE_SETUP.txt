@@ -1,0 +1,47 @@
+CRYPTO SCANNER 6.0.3 — NOBITEX LIVE AUTO TRADING
+================================================
+
+This build is optimized for Nobitex IRT spot markets.
+
+WHAT CHANGED
+------------
+1. Live auto-scan uses Nobitex /market/stats directly.
+2. The live SignalTracker is now connected to TradingBot/Nobitex.
+3. Paper Trading remains separate in its own database.
+4. Real positions use real Nobitex fills, not simulated fills.
+5. After a real BUY fill, a native Nobitex stop_market SELL is placed.
+6. Trailing stops replace the exchange-side stop safely (new stop first, old stop second).
+7. Low-priced assets keep sufficient price precision.
+8. Market orders use a small slippage guard based on the current Nobitex ask.
+9. The complete Nobitex market snapshot is processed every 30 seconds so open positions
+   continue to be monitored even when there is no new entry signal.
+10. Exposure, max positions, cooldowns and drawdown protections remain active.
+
+DEFAULT REAL SETTINGS
+---------------------
+Exchange: Nobitex
+Quote: IRT
+Spot: Yes
+Auto trading: enabled when the configured Nobitex executor is READY
+Max open positions: 3
+Max exposure: 50% of current equity
+Position target: 5,000,000 IRT
+Minimum order: 3,000,000 IRT
+Initial stop: 3%
+Trailing activation: 1.5%
+Trailing distance: 1.5%
+Scan interval: 30 seconds
+New entries per cycle: 1
+Confirmation: enabled
+
+IMPORTANT
+---------
+No trading strategy can guarantee profit or pay for a trip. The purpose of this build is
+reliable execution and risk containment, not guaranteed returns.
+
+Keep the API key restricted to trading only. Do not enable withdrawals for the bot key.
+Start with a small allocation and verify one real order + one protective stop before
+leaving the computer unattended.
+
+The distribution ZIP intentionally does NOT include private credentials from the
+original secrets/ directory.
