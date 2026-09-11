@@ -1,7 +1,7 @@
 # api/api_coinmarketcap.py
 from __future__ import annotations
 
-from typing import Iterable, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 from api.api_base import ApiBaseClient
 from core.config import API_KEYS
@@ -67,6 +67,64 @@ class CoinMarketCapClient(ApiBaseClient):
             params["aux"] = aux
 
         return self._request(f"{self.API_V3}/cryptocurrency/listings/latest", params=params)
+
+    def get_quotes_batched(
+        self,
+        *,
+        symbols: Optional[Iterable[Union[str, int]]] = None,
+        ids: Optional[Iterable[Union[str, int]]] = None,
+        convert: str = "USD",
+        batch_size: int = 100,
+        aux: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Fetch latest quotes in batches and return a listings-like payload.
+
+        CoinMarketCap ``quotes/latest`` accepts a limited identifier list per
+        call. This helper chunks the request and merges ``data`` into a single
+        dict so the global-lead engine can treat it like ``listings/latest``.
+        """
+        batch_size = max(1, min(int(batch_size or 100), 1000))
+        chunks: List[List[str]] = []
+        if ids is not None:
+            items = [str(item).strip() for item in ids if str(item).strip()]
+            key = "id"
+        elif symbols is not None:
+            items = [str(item).strip().upper() for item in symbols if str(item).strip()]
+            key = "symbol"
+        else:
+            raise ValueError("Exactly one of symbols or ids must be provided.")
+
+        seen = []
+        unique = []
+        for item in items:
+            if item in seen:
+                continue
+            seen.append(item)
+            unique.append(item)
+        for i in range(0, len(unique), batch_size):
+            chunks.append(unique[i:i + batch_size])
+
+        merged: Dict[str, Any] = {"data": {}}
+        for chunk in chunks:
+            if key == "id":
+                payload = self.get_quotes(id=chunk, convert=convert, aux=aux)
+            else:
+                payload = self.get_quotes(symbol=chunk, convert=convert, aux=aux)
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("status") and "status" not in merged:
+                merged["status"] = payload.get("status")
+            data = payload.get("data")
+            if isinstance(data, dict):
+                merged["data"].update(data)
+            elif isinstance(data, list):
+                for row in data:
+                    if not isinstance(row, dict):
+                        continue
+                    ident = str(row.get("id") or row.get("symbol") or "").strip()
+                    if ident:
+                        merged["data"][ident] = row
+        return merged
 
     def get_quotes(
         self,

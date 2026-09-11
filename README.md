@@ -1,4 +1,4 @@
-# CryptoScanner 6.0.3 — Real Trading Release Candidate
+# CryptoScanner 6.1.0 — Real Trading Release Candidate
 
 CryptoScanner is a desktop crypto scanner and execution engine built around a configurable **Real Price Movement** strategy.
 
@@ -30,17 +30,18 @@ CoinMarketCap's current API provides latest price, volume, market cap and percen
 
 The strategy does not generate synthetic/random market prices.
 
-At each scan CryptoScanner stores the actual CMC price observed for an asset. The configured `Movement Threshold (%)` is compared with the price observed `Movement Lookback (scans)` earlier. Entry candidates must also pass liquidity and risk filters.
+At each scan CryptoScanner stores the actual CMC USD price observed for an asset **and** the live Nobitex ask. Entry is based on that stored path (lookback scans), not on a synthetic price generator. CMC's rolling 1h field is only a confirmation; a falling observed path blocks the trade.
 
 Recommended initial settings for a live account:
 
-- Movement Threshold: 3% or higher
-- Lookback: 3 scans
+- Movement Threshold: 2.5% or higher (CMC 1h or observed lookback)
+- Lookback: 6 scans (~90s at the 15s default interval)
+- Scan interval: 15 seconds
 - Max open positions: 1–3
-- Max total exposure: 30% or lower
-- Max position: 10% or lower
+- Max total exposure: 50% or lower
+- Max position: 25% or lower
 - Stop Loss: 3%
-- Trailing Distance: 2%
+- Trailing Distance: 1.5%
 - Auto Trading: **OFF until connection diagnostics pass**
 
 These are software defaults, not financial recommendations.
@@ -121,7 +122,7 @@ python main.py --version
 
 ## Tests
 
-The release candidate passes the project's automated test suite:
+The release candidate is covered by the project's automated test suite:
 
 ```text
 113 passed

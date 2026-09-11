@@ -864,9 +864,10 @@ class TradingBot:
             logger.error("place_order failed for %s: %s", execution_symbol, exc)
             return {"status": "error", "order_id": None, "message": str(exc)}
 
-    def get_usdt_irt_rate(self) -> Optional[float]:
-        rows = self.get_all_market_stats("IRT")
-        for row in rows:
+    def get_usdt_irt_rate(self, rows: Optional[List[Dict[str, Any]]] = None) -> Optional[float]:
+        if rows is None:
+            rows = self.get_all_market_stats("IRT")
+        for row in rows or []:
             if str(row.get("Symbol", "")).upper() == "USDT":
                 ask = _safe_float(row.get("Ask"))
                 if ask and ask > 0:

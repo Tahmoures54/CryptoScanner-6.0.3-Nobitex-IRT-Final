@@ -2,21 +2,21 @@
 
 ## Purpose
 
-Real trading no longer treats a local Nobitex pump as the primary source of alpha. The live strategy uses two distinct layers:
+Live trading uses two distinct layers and **stores the actual prices observed on every scan**:
 
 1. **Global market intelligence — CoinMarketCap**
-   - 1h momentum
-   - 24h volume
-   - market cap
-   - quote freshness
+   - Fresh `quotes/latest` for symbols that exist on Nobitex (listings cache for the universe)
+   - Observed USD move across lookback scans (primary)
+   - CMC 1h / 24h / volume-change as confirmation
+   - Quote freshness
 2. **Local execution — Nobitex IRT**
-   - live bid/ask
-   - spread
-   - local 24h quote volume
-   - USDT/IRT conversion rate
-   - actual executable ask price
+   - Live bid/ask
+   - Spread and 24h quote volume
+   - USDT/IRT conversion
+   - Actual executable ask
+   - Observed IRT move across the same lookback
 
-The bot only creates a new real entry candidate when the same asset is globally strong **and** Nobitex is materially below the calculated local fair value.
+The bot only creates a new real entry candidate when the same asset is globally strong **and** Nobitex is still below the calculated local fair value **and** the CMC price path we stored is not already falling.
 
 ## Fair-value calculation
 
@@ -29,20 +29,38 @@ Nobitex Discount % =
 
 A positive discount means the Nobitex ask is below the calculated global fair value.
 
+## Real observed movement
+
+At each cycle the engine appends the CMC USD price and the Nobitex ask to a per-symbol history.
+
+```text
+Observed Global Move % =
+    (CMC USD now − CMC USD N scans ago) / CMC USD N scans ago × 100
+```
+
+- A green CMC 1h print is rejected when our stored CMC path is already falling.
+- A live observed pump can qualify even if CMC's rolling 1h field is still below the threshold.
+- Local observed move must not have already overtaken the global move (lag still open).
+
 ## Entry guards
 
 The default production configuration requires:
 
-- Global 1h move >= 3.0%
-- Nobitex discount >= 1.5%
-- Nobitex spread <= 1.2%
-- Global 24h volume >= $250,000
-- Global quote age <= 180 seconds
+- Global 1h move >= 2.5% **or** observed CMC move >= 2.5%
+- Stored CMC path not falling
+- Nobitex discount >= 1.2% and <= 18%
+- Nobitex spread <= 1.0%
+- Global 24h volume >= $300,000
+- Global quote age <= 120 seconds
 - Nobitex local volume >= 1,000,000 IRT
-- Nobitex short-term movement must not be falling more than 0.75%
+- Nobitex short-term movement must not be falling more than 0.5%
 - Maximum chase <= 1.0%
+- Skip alts when BTC is dumping more than 1.5% on 1h / observed path
+- Skip names already up more than 16% on the local 24h print
 
 These are risk/quality filters, not profit guarantees.
+
+After a candidate is tagged, SignalTracker can still wait for a small local confirmation tick (Nobitex ask continuing up) before sending the Nobitex order.
 
 ## Why USDT/IRT matters
 
@@ -51,6 +69,8 @@ Comparing a USD global price directly to an IRT local price is invalid. The bot 
 ## Execution
 
 `trading/global_lead_engine.py` is deliberately an analysis-only component. It never sends orders. `SignalTracker` remains responsible for confirmation, position limits, stop loss, trailing stop, and actual execution through `TradingBot`.
+
+Scan interval is `check_interval_seconds` (default 15s) so open positions and CMC/Nobitex prices are monitored continuously.
 
 ## Data-source separation
 

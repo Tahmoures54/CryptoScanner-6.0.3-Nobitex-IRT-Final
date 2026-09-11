@@ -1,4 +1,4 @@
-# CryptoScanner 6.0.3 — Nobitex Auto Trading
+# CryptoScanner 6.1.0 — Nobitex Auto Trading
 
 This build uses CoinMarketCap for global market intelligence and Nobitex as the sole live execution venue.
 
@@ -19,14 +19,15 @@ This build uses CoinMarketCap for global market intelligence and Nobitex as the 
 
 Official Nobitex API documentation: https://apidocs.nobitex.ir/
 
-## Live data-source policy (vNext)
+## Live data-source policy (v6.1)
 
-The automatic real-trading path is now **Global Lead → Nobitex Local Lag → Nobitex execution**.
+The automatic real-trading path is **Observed Global Lead → Nobitex Local Lag → Nobitex execution**.
 
 - Market universe: Nobitex `/market/stats` filtered to IRT/Rial markets.
-- Global lead: CoinMarketCap latest listings, using global 1h momentum, volume and quote freshness.
-- Fair-value conversion: CMC USD price × live Nobitex USDT/IRT Ask.
-- Entry: only when Nobitex Ask is sufficiently below fair value and local spread/volume/momentum safety filters pass.
+- Global lead: CoinMarketCap listings cache plus fresh `quotes/latest` for overlapping symbols.
+- Observed movement: actual CMC USD and Nobitex ask stored every `check_interval_seconds` (default 15s).
+- Fair-value conversion: CMC USD price × live Nobitex USDT/IRT Ask (from the same snapshot, no extra round-trip).
+- Entry: only when Nobitex Ask is still below fair value, the stored CMC path is not falling, and local spread/volume/momentum safety filters pass.
 - Existing positions: monitored from the full live Nobitex market snapshot every cycle.
 - The legacy Real Trading panel auto-signal queue is bypassed while `global_lead_local_lag` is active, preventing duplicate live orders.
 - Public CoinGecko/CoinMarketCap/Binance scanner data is never routed into the real executor.
