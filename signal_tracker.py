@@ -117,6 +117,8 @@ class SignalTracker:
 
         self.max_new_entries_per_cycle = 3
         self.max_drawdown_percent = 15.0
+        self.max_total_exposure_pct = 90.0
+        self.entry_cooldown_seconds = 300
         self.halt_on_max_drawdown = True
         self.cooldown_after_loss_min = 15
         self.cooldown_after_win_min = 15
@@ -480,6 +482,8 @@ class SignalTracker:
         if self.position_size_mode not in ("fixed", "risk_percent"):
             self.position_size_mode = "risk_percent"
         self.max_drawdown_percent = _num("max_drawdown_percent", self.max_drawdown_percent)
+        self.max_total_exposure_pct = _num("max_total_exposure_pct", self.max_total_exposure_pct)
+        self.entry_cooldown_seconds = _num("entry_cooldown_seconds", self.entry_cooldown_seconds, int)
         self.min_volume_24h = _num("min_volume_24h", self.min_volume_24h)
         self.min_market_cap = _num("min_market_cap", self.min_market_cap)
         self.max_new_entries_per_cycle = _num(
@@ -531,6 +535,10 @@ class SignalTracker:
             self.stop_loss_pct = 3.0
         if self.max_drawdown_percent <= 0 or self.max_drawdown_percent > 50:
             self.max_drawdown_percent = 15.0
+        if self.max_total_exposure_pct <= 0 or self.max_total_exposure_pct > 100:
+            self.max_total_exposure_pct = 90.0
+        if self.entry_cooldown_seconds < 0:
+            self.entry_cooldown_seconds = 0
         if self.take_profit_percent < 0:
             self.take_profit_percent = 0.0
         if self.min_quality < 0 or self.min_quality > 1:
@@ -1396,7 +1404,13 @@ class SignalTracker:
         if self.mode == "real" and self.executor:
             try:
                 ticker = self.executor.get_ticker(symbol)
-                real_price = float(ticker.get("last") or ticker.get("price") or entry_price)
+                real_price = float(
+                    ticker.get("ask")
+                    or ticker.get("Ask")
+                    or ticker.get("last")
+                    or ticker.get("price")
+                    or entry_price
+                )
                 if real_price <= 0:
                     real_price = entry_price
                 entry_price = real_price
@@ -1415,10 +1429,11 @@ class SignalTracker:
 
         notional = pos_size * entry_price
         exposure = self._open_exposure(cur)
-        if exposure + notional > self.account_balance * 0.9:
+        exposure_cap = self.account_balance * (self.max_total_exposure_pct / 100.0)
+        if exposure + notional > exposure_cap:
             logger.warning(
-                "Skip open %s: exposure limit (exposure=%.2f + notional=%.2f > 90%% of balance=%.2f)",
-                symbol, exposure, notional, self.account_balance,
+                "Skip open %s: exposure limit (exposure=%.2f + notional=%.2f > %.1f%% of balance=%.2f)",
+                symbol, exposure, notional, self.max_total_exposure_pct, self.account_balance,
             )
             return False
 
@@ -1579,6 +1594,8 @@ class SignalTracker:
     def _extract_pump_percentage(self, row: Dict[str, Any], signal: str) -> Optional[float]:
         for key in (
             "pump_percentage", "Pump Percentage", "pump_pct", "Pump_Pct",
+            "LiveLeadMove (%)", "ObservedGlobalMove (%)", "Global1hPct",
+            "Nobitex Discount (%)",
             "Change", "1h Change (%)", "change_1h", "percent_change_1h",
             "price_change_percentage_1h", "price_change_pct",
         ):
@@ -1654,7 +1671,7 @@ class SignalTracker:
 
         signal = str(row.get("Signal") or row.get("signal") or "").strip()
         signal_l = signal.lower()
-        if not any(x in signal_l for x in ("buy", "movement", "pump")):
+        if not any(x in signal_l for x in ("buy", "movement", "pump", "lead")):
             self._log_skip("%s skipped: non-entry signal '%s'", symbol, signal)
             return
 
@@ -1768,7 +1785,9 @@ class SignalTracker:
             cur, row, price, symbol, ak, stats, signal, pump_pct,
         )
         if opened:
-            self._set_cooldown(cur, ak, symbol, 15, "post-pump-entry")
+            cooldown_min = max(1, int(round(self.entry_cooldown_seconds / 60.0))) if self.entry_cooldown_seconds else 0
+            if cooldown_min > 0:
+                self._set_cooldown(cur, ak, symbol, cooldown_min, "post-pump-entry")
             open_asset_keys.add(ak)
         else:
             logger.debug("No position opened for %s — skipping cooldown.", symbol)
@@ -1819,8 +1838,9 @@ class SignalTracker:
                             sig = str(item.get("Signal", item.get("signal", ""))).lower()
                             score = safe_float(item.get("Score", item.get("score"))) or 0.0
                             boost = (
-                                25.0 if "strong buy" in sig
-                                else 10.0 if "buy" in sig or "movement" in sig
+                                30.0 if "global lead" in sig
+                                else 25.0 if "strong buy" in sig
+                                else 10.0 if "buy" in sig or "movement" in sig or "pump" in sig
                                 else 0.0
                             )
                             return score + boost

@@ -22,7 +22,7 @@ import tkinter as tk
 from tkinter import ttk
 import requests
 
-from core.config import CONFIG_FILE
+from core.config import APPDATA_DIR, CONFIG_FILE
 from gui.dialogs.base_dialog import BaseDialog
 from gui.dialogs.components import SectionFrame, safe_clipboard_paste, style_button
 from gui.gui_helpers import ToolTip
@@ -36,15 +36,28 @@ _CMC_TEST_URL  = "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/l
 _CG_TEST_URL   = "https://api.coingecko.com/api/v3/ping"
 _BINANCE_TEST_URL = "https://api.binance.com/api/v3/ping"
 
-# مسیر فایل تنظیمات ربات (نسبت به ریشه پروژه)
-BOT_CONFIG_PATH = os.path.join(
+TEMPLATE_BOT_CONFIG_PATH = os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
     "data", "bot_config.json",
 )
+BOT_CONFIG_PATH = os.path.join(APPDATA_DIR, "bot_config.json")
 
 # در Nobitex، IRT به معنی ریال است. ۱ تومان = ۱۰ ریال.
 # برای نمایش به کاربر ایرانی، همه چیز را به تومان نشان می‌دهیم.
 TOMAN_PER_RIAL = 0.1
+
+
+def _load_bot_conf() -> dict:
+    for path in (BOT_CONFIG_PATH, TEMPLATE_BOT_CONFIG_PATH):
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as exc:
+            logger.warning("Could not load bot_config.json from %s: %s", path, exc)
+    return {}
 
 
 def _is_irt_quote(cfg: dict) -> bool:
@@ -72,13 +85,7 @@ class SettingsWindow(BaseDialog):
         # آیا کاربر ایرانی است؟ (برای نمایش تومان)
         self._use_toman = True   # پيش‌فرض برای IRT
 
-        # بارگذاری اولیه bot_config
-        try:
-            with open(BOT_CONFIG_PATH, "r", encoding="utf-8") as f:
-                self._bot_conf = json.load(f)
-        except Exception as e:
-            logger.warning(f"Could not load bot_config.json: {e}")
-            self._bot_conf = {}
+        self._bot_conf = _load_bot_conf()
 
         self._use_toman = _is_irt_quote(self._bot_conf)
 
@@ -452,7 +459,7 @@ class SettingsWindow(BaseDialog):
             ("pump_threshold_pct", "آستانه حرکت قیمت (%)",
              "حداقل رشد قیمت برای ورود (پیش‌فرض 3.0)", 3.0),
             ("movement_lookback_scans", "تعداد اسکن برای محاسبه حرکت",
-             "چند اسکن قبلی مبنای محاسبه باشد (پیش‌فرض 3)", 3),
+             "چند اسکن قبلی مبنای حرکت واقعی CMC باشد (پیش‌فرض 6)", 6),
             ("min_volume_24h", "حداقل حجم ۲۴ ساعته ($)",
              "توکن‌های بی‌نقدینگی رد شوند (پیشنهاد: 500000)", 500000.0),
         ]
@@ -650,7 +657,15 @@ class SettingsWindow(BaseDialog):
             ("max_chase_pct", "Max Chase (%)", 1.0),
             ("account_balance", "Account Balance (quote)", 10000000.0),
             ("kline_limit", "Kline Limit", 100),
-            ("check_interval_seconds", "Check Interval (sec)", 60),
+            ("check_interval_seconds", "Check Interval (sec)", 15),
+            ("global_pump_threshold_pct", "CMC / observed lead threshold (%)", 2.5),
+            ("min_nobitex_discount_pct", "Min Nobitex discount vs CMC (%)", 1.2),
+            ("max_nobitex_spread_pct", "Max Nobitex spread (%)", 1.0),
+            ("min_global_volume_usd", "Min CMC 24h volume (USD)", 300000.0),
+            ("max_global_quote_age_sec", "Max CMC quote age (sec)", 120.0),
+            ("min_observed_move_pct", "Min observed CMC move (%)", 0.45),
+            ("max_local_24h_pct", "Max local 24h already-pumped (%)", 16.0),
+            ("btc_max_dump_pct", "Skip alts if BTC dumps more than (%)", 1.5),
         ]
 
         for i, (key, label, default) in enumerate(fields):
@@ -848,8 +863,9 @@ class SettingsWindow(BaseDialog):
         self.app.save_api_key(new_key)
         self.app.save_settings()
 
-        # 2) بارگذاری مجدد bot_config.json
+        # 2) بارگذاری مجدد bot_config.json از AppData (مسیر واقعی ربات)
         try:
+            os.makedirs(os.path.dirname(BOT_CONFIG_PATH), exist_ok=True)
             with open(BOT_CONFIG_PATH, "r", encoding="utf-8") as f:
                 bot_conf = json.load(f)
         except Exception:
@@ -885,7 +901,7 @@ class SettingsWindow(BaseDialog):
             "max_new_entries_per_cycle", "cooldown_after_loss_min",
             "cooldown_after_win_min", "entry_cooldown_seconds",
             "confirmation_max_minutes", "kline_limit",
-            "check_interval_seconds",
+            "check_interval_seconds", "min_confirm_scans",
         }
         skip_keys = {
             "fixed_position_quote", "max_notional_quote",
@@ -926,36 +942,60 @@ class SettingsWindow(BaseDialog):
         except Exception:
             pass
 
-        # 7) Save file
+        bot_conf["strategy"] = "global_lead_local_lag"
+        bot_conf["global_signal_source"] = "CoinMarketCap"
+
+        # 7) Save file to the live AppData config the executor actually reads
         try:
+            os.makedirs(os.path.dirname(BOT_CONFIG_PATH), exist_ok=True)
             with open(BOT_CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(bot_conf, f, indent=4, ensure_ascii=False)
-            logger.info("Settings saved to bot_config.json")
+            logger.info("Settings saved to %s", BOT_CONFIG_PATH)
         except Exception as e:
             logger.error("Failed to save bot_config.json: %s", e)
 
         self.close()
 
-        # 8) Apply to running tracker if possible
+        # 8) Apply to running paper + live trackers
+        apply_keys = (
+            "pump_threshold_pct", "stop_loss_pct",
+            "trailing_distance_pct", "risk_per_trade_pct",
+            "max_open_trades", "take_profit_percent",
+            "max_drawdown_percent", "fixed_position_quote",
+            "position_size_mode", "max_position_pct",
+            "max_notional_quote", "min_notional_quote", "min_volume_24h",
+            "min_market_cap", "max_new_entries_per_cycle",
+            "cooldown_after_loss_min", "cooldown_after_win_min",
+            "max_total_exposure_pct", "entry_cooldown_seconds",
+            "confirmation_enabled", "confirmation_pct",
+            "confirmation_max_minutes", "invalidation_pct", "max_chase_pct",
+        )
         try:
-            if hasattr(self.app, "signal_tracker"):
-                st = self.app.signal_tracker
-                for key in ("pump_threshold_pct", "stop_loss_pct",
-                            "trailing_distance_pct", "risk_per_trade_pct",
-                            "max_open_trades", "take_profit_percent",
-                            "max_drawdown_percent", "fixed_position_quote",
-                            "position_size_mode", "max_position_pct",
-                            "max_notional_quote", "min_volume_24h",
-                            "min_market_cap", "max_new_entries_per_cycle",
-                            "cooldown_after_loss_min", "cooldown_after_win_min"):
+            for attr in ("signal_tracker", "real_signal_tracker"):
+                st = getattr(self.app, attr, None)
+                if st is None:
+                    continue
+                for key in apply_keys:
                     if key in bot_conf:
                         try:
                             setattr(st, key, bot_conf[key])
                         except Exception:
                             pass
-                st._save_state()
+                if hasattr(st, "max_open_trades") and "max_open_positions" in bot_conf:
+                    st.max_open_trades = int(bot_conf["max_open_positions"])
+                if hasattr(st, "_save_state"):
+                    st._save_state()
         except Exception as exc:
             logger.warning("Could not hot-apply settings: %s", exc)
+
+        try:
+            from trading.bot_config import load_config
+            cfg = load_config(BOT_CONFIG_PATH)
+            self.app._bot_cfg = cfg
+            if hasattr(self.app, "_configure_global_lead_engine"):
+                self.app._configure_global_lead_engine(cfg)
+        except Exception as exc:
+            logger.warning("Could not rebuild live lead engine: %s", exc)
 
         try:
             self.app.refresh()

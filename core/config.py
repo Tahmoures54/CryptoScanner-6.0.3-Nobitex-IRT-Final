@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 # Version
 # ══════════════════════════════════════════════════════════════
 
-APP_VERSION: str = "6.0.1"
+APP_VERSION: str = "6.1.0"
 APP_NAME:    str = "CryptoScanner"
 
 # ══════════════════════════════════════════════════════════════

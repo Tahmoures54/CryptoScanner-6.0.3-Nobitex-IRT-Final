@@ -760,13 +760,13 @@ class TestBotConfig:
         assert cfg.max_drawdown_percent == 12.0
         assert cfg.max_daily_loss       == 12.0
 
-    def test_to_dict_no_alias_keys(self, cfg):
+    def test_to_dict_uses_canonical_field_names(self, cfg):
         d = cfg.to_dict()
-        assert "stop_loss_pct"   not in d
-        assert "take_profit_pct" not in d
-        assert "max_positions"   not in d
-        assert "stop_loss_percent" in d
+        assert "stop_loss_pct" in d
         assert "take_profit_percent" in d
+        assert "max_open_positions" in d
+        assert "max_positions" not in d
+        assert "take_profit_pct" not in d
 
     def test_from_dict_alias_mapping(self):
         from trading.bot_config import BotConfig

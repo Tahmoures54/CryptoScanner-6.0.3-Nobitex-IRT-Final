@@ -24,6 +24,7 @@ def test_nobitex_uses_production_apiv2_and_ed25519_headers(monkeypatch):
 
     class Response:
         status_code = 200
+        content = b"{}"
         def raise_for_status(self):
             pass
         def json(self):
@@ -33,7 +34,7 @@ def test_nobitex_uses_production_apiv2_and_ed25519_headers(monkeypatch):
         captured.update(method="GET", url=url, headers=headers, data=None)
         return Response()
 
-    monkeypatch.setattr("trading.nobitex_client.requests.get", fake_get)
+    monkeypatch.setattr(client._session, "get", fake_get)
     client._request("GET", "/users/wallets/list", signed=True)
 
     assert client.BASE_URL == "https://apiv2.nobitex.ir"
@@ -50,6 +51,7 @@ def test_nobitex_balance_uses_rial_wallet_and_exposes_irt_alias(monkeypatch):
 
     class Response:
         status_code = 200
+        content = b"{}"
         def raise_for_status(self):
             pass
         def json(self):
@@ -61,15 +63,11 @@ def test_nobitex_balance_uses_rial_wallet_and_exposes_irt_alias(monkeypatch):
                 ],
             }
 
-    def fake_get(url, headers=None, timeout=None):
-        captured.update(url=url, headers=headers)
-        return Response()
-
     def fake_request(method, url, headers=None, data=None, timeout=None):
         captured.update(url=url, headers=headers, method=method, data=data)
         return Response()
 
-    monkeypatch.setattr("trading.nobitex_client.requests.request", fake_request)
+    monkeypatch.setattr(client._session, "request", fake_request)
     assert client.get_balance("IRT") == 125000000.0
     assert client.get_balance("RLS") == 125000000.0
     assert captured["url"] == "https://apiv2.nobitex.ir/users/wallets/list"
@@ -80,6 +78,7 @@ def test_all_irt_market_stats_are_normalized(monkeypatch):
     def fake_get(url, headers=None, timeout=None):
         class Response:
             status_code = 200
+            content = b"{}"
             def raise_for_status(self): pass
             def json(self):
                 return {"status":"ok","stats":{
@@ -87,7 +86,7 @@ def test_all_irt_market_stats_are_normalized(monkeypatch):
                     "btc-usdt":{"isClosed":False,"latest":"100","dayChange":"2"},
                 }}
         return Response()
-    monkeypatch.setattr("trading.nobitex_client.requests.get", fake_get)
+    monkeypatch.setattr(client._session, "get", fake_get)
     rows = client.get_all_market_stats("IRT")
     assert len(rows) == 1
     assert rows[0]["Symbol"] == "VTHO"
@@ -100,12 +99,13 @@ def test_low_price_stop_price_keeps_precision(monkeypatch):
     captured = {}
     class Response:
         status_code = 200
+        content = b"{}"
         def raise_for_status(self): pass
         def json(self):
             return {"status":"ok","order":{"id":123,"status":"Inactive","execution":"StopMarket","amount":"1000","matchedAmount":"0","price":"market"}}
     def fake_request(method, url, headers=None, data=None, timeout=None):
         captured["data"] = json.loads(data)
         return Response()
-    monkeypatch.setattr("trading.nobitex_client.requests.request", fake_request)
+    monkeypatch.setattr(client._session, "request", fake_request)
     client.place_order("VTHOIRT", "sell", "stop_market", 1000, stop_price=0.00067225)
     assert captured["data"]["stopPrice"] == "0.00067225"
