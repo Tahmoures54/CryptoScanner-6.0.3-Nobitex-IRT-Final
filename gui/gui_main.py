@@ -469,7 +469,11 @@ class CryptoScannerApp:
                                 if self._has_executable_depth(hit, min_depth)
                             ]
                 except Exception as exc:
-                    logger.warning("[REAL][GLOBAL] Global lead data unavailable: %s", exc)
+                    logger.warning(
+                        "[REAL][GLOBAL] Global lead data unavailable: %s",
+                        exc,
+                        exc_info=True,
+                    )
 
             candidate_map = {str(x.get("Symbol", "")).upper(): x for x in candidates}
             for row in live_rows:
@@ -1119,14 +1123,13 @@ class CryptoScannerApp:
             return "Neutral"
         try:
             if self.api_source_var.get() == "CoinMarketCap":
-                change = (
-                    g_data.get("data", {}).get("quote", {})
-                    .get("USD", {}).get("market_cap_change_24h", 0)
-                )
+                usd = extract_usd_quote(g_data.get("data") if isinstance(g_data, dict) else g_data)
+                change = usd.get("market_cap_change_24h") or usd.get("percent_change_24h") or 0
             else:
-                change = g_data.get("data", {}).get(
-                    "market_cap_change_percentage_24h_usd", 0,
-                )
+                data = g_data.get("data") if isinstance(g_data, dict) else {}
+                if not isinstance(data, dict):
+                    data = {}
+                change = data.get("market_cap_change_percentage_24h_usd", 0)
             change = float(change or 0)
             if change > 2.0:
                 return "Strong Bull"

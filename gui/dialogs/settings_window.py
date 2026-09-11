@@ -829,21 +829,22 @@ class SettingsWindow(BaseDialog):
         self._test_result_lbl.config(text="Testing…", fg=T.INFO)
 
         def worker():
+            def show(text: str, fg: str) -> None:
+                self._test_result_lbl.config(text=text, fg=fg)
+
             try:
                 resp = requests.get(url, headers=headers, timeout=10) if headers else requests.get(url, timeout=10)
-                ok = resp.status_code == 200
-                if ok:
-                    self.root.after(0, lambda: self._test_result_lbl.config(
-                        text="✅ Success", fg=T.SUCCESS_DARK))
+                if resp.status_code == 200:
+                    self._safe_ui_call_from_thread(lambda: show("✅ Success", T.SUCCESS_DARK))
                 else:
-                    self.root.after(0, lambda: self._test_result_lbl.config(
-                        text=f"❌ Error {resp.status_code}", fg=T.DANGER))
-            except Exception as e:
-                self.root.after(0, lambda: self._test_result_lbl.config(
-                    text=f"❌ {str(e)[:50]}", fg=T.DANGER))
+                    code = resp.status_code
+                    self._safe_ui_call_from_thread(lambda: show(f"❌ Error {code}", T.DANGER))
+            except Exception as exc:
+                msg = str(exc)[:50]
+                self._safe_ui_call_from_thread(lambda: show(f"❌ {msg}", T.DANGER))
             finally:
                 self._testing = False
-                self.root.after(0, lambda: self._test_btn.config(state="normal"))
+                self._safe_ui_call_from_thread(lambda: self._test_btn.config(state="normal"))
 
         threading.Thread(target=worker, daemon=True).start()
 
