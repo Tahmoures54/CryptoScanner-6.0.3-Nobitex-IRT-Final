@@ -17,7 +17,12 @@ This build uses CoinMarketCap for global market intelligence and Nobitex as the 
 - Nobitex documents that market orders can be rejected for insufficient balance, invalid market, minimum order size, duplicate orders, etc.; the application logs the exchange response.
 - No strategy can guarantee profit or pay for a trip. Use a small allocation first and keep the stop-loss active.
 
-Official Nobitex API documentation: https://apidocs.nobitex.ir/
+Official Nobitex API documentation:
+
+- API keys: https://apidocs.nobitex.ir/api_key/%DA%A9%D9%84%DB%8C%D8%AF-api
+- Auth / signature guide: https://apidocs.nobitex.ir/api_key/api-key-guide
+
+Create the bot key with **`READ,TRADE` only**. Do not enable `WITHDRAW`. The public key goes in `Nobitex-Key`; the private key never leaves this PC. Production timestamps must stay within 30 seconds of UTC. The client identifies itself as `TraderBot/CryptoScanner-<version>`.
 
 ## Live data-source policy (v6.1)
 

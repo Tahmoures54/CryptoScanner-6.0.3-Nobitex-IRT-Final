@@ -1449,33 +1449,41 @@ class BotSettingsWindow(BaseDialog):
         self._exchange_cb.set_completion_list(get_ccxt_exchanges())
         self._exchange_cb.grid(row=0, column=1, sticky="ew", padx=T.PAD_SM, pady=T.PAD_XS)
 
-        tk.Label(ef, text="API Key:", font=T.font(size=T.FONT_SM),
+        tk.Label(ef, text="Nobitex public key:", font=T.font(size=T.FONT_SM),
                  bg=T.BG_APP, fg=T.TEXT_SECONDARY).grid(row=1, column=0, sticky="w", pady=T.PAD_XS)
         self._api_key_var = tk.StringVar(value=self.config.api_key or "")
         ttk.Entry(ef, textvariable=self._api_key_var, width=32).grid(
             row=1, column=1, sticky="ew", padx=T.PAD_SM, pady=T.PAD_XS
         )
 
-        tk.Label(ef, text="Secret:", font=T.font(size=T.FONT_SM),
+        tk.Label(ef, text="Nobitex private key:", font=T.font(size=T.FONT_SM),
                  bg=T.BG_APP, fg=T.TEXT_SECONDARY).grid(row=2, column=0, sticky="w", pady=T.PAD_XS)
         self._api_secret_var = tk.StringVar(value=self.config.api_secret or "")
         ttk.Entry(ef, textvariable=self._api_secret_var, width=32, show="*").grid(
             row=2, column=1, sticky="ew", padx=T.PAD_SM, pady=T.PAD_XS
         )
+        tk.Label(
+            ef,
+            text="Create the key in Nobitex with permissions READ,TRADE only (no WITHDRAW). "
+            "Paste field key as the public key and the one-time privateKey. "
+            "PC clock must stay within 30 seconds of UTC.",
+            font=T.font(size=T.FONT_XS),
+            bg=T.BG_APP, fg=T.TEXT_MUTED, wraplength=520, justify="left",
+        ).grid(row=3, column=0, columnspan=2, sticky="w", padx=T.PAD_SM, pady=(0, T.PAD_SM))
 
         self._testnet_var = tk.BooleanVar(value=self.config.testnet)
         ttk.Checkbutton(ef, text="Use Testnet", variable=self._testnet_var).grid(
-            row=3, column=1, sticky="w", pady=2
+            row=4, column=1, sticky="w", pady=2
         )
 
         if str(self.config.exchange).lower() == "nobitex":
             tk.Label(ef, text="Market:", font=T.font(size=T.FONT_SM),
-                     bg=T.BG_APP, fg=T.TEXT_SECONDARY).grid(row=4, column=0, sticky="w", pady=T.PAD_XS)
+                     bg=T.BG_APP, fg=T.TEXT_SECONDARY).grid(row=5, column=0, sticky="w", pady=T.PAD_XS)
             self._nobitex_market_var = tk.StringVar(value=getattr(self.config, "nobitex_market", "IRT"))
             ttk.Combobox(
                 ef, textvariable=self._nobitex_market_var, values=["IRT", "USDT"],
                 state="readonly", width=10,
-            ).grid(row=4, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
+            ).grid(row=5, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS)
 
     def _build_capital_section(self, parent) -> None:
         cf = tk.LabelFrame(

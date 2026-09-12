@@ -1,9 +1,10 @@
 import base64
 import json
+import re
 
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
-from trading.nobitex_client import NobitexClient
+from trading.nobitex_client import USER_AGENT, NobitexClient, _urlsafe_b64decode
 
 
 def _client():
@@ -18,47 +19,81 @@ def _client():
     )
 
 
+class _Ok:
+    status_code = 200
+    content = b"{}"
+
+    def json(self):
+        return {"status": "ok"}
+
+
 def test_nobitex_uses_production_apiv2_and_ed25519_headers(monkeypatch):
     client = _client()
     captured = {}
 
-    class Response:
-        status_code = 200
-        content = b"{}"
-        def raise_for_status(self):
-            pass
+    class Response(_Ok):
         def json(self):
-            return {"status": "ok", "wallets": []}
+            return {"status": "ok", "orders": []}
 
     def fake_get(url, headers=None, timeout=None):
         captured.update(method="GET", url=url, headers=headers, data=None)
         return Response()
 
     monkeypatch.setattr(client._session, "get", fake_get)
-    client._request("GET", "/users/wallets/list", signed=True)
+    client._request("GET", "/market/orders/list", query_params={"status": "open"}, signed=True)
 
     assert client.BASE_URL == "https://apiv2.nobitex.ir"
-    assert captured["url"] == "https://apiv2.nobitex.ir/users/wallets/list"
+    assert captured["url"].startswith("https://apiv2.nobitex.ir/market/orders/list")
     assert captured["headers"]["Nobitex-Key"]
     assert captured["headers"]["Nobitex-Signature"]
     assert captured["headers"]["Nobitex-Timestamp"]
+    assert captured["headers"]["User-Agent"].startswith("TraderBot/CryptoScanner-")
+    assert captured["headers"]["User-Agent"] == USER_AGENT
     assert "Authorization" not in captured["headers"]
+    assert "Content-Type" not in captured["headers"]
+
+
+def test_sign_request_matches_official_payload_formula():
+    client = _client()
+    timestamp = "1700000000"
+    method = "POST"
+    full_path = "/market/orders/cancel-old"
+    body = json.dumps({"hours": 2.4}, separators=(",", ":"))
+    signature_b64 = client._sign_request(timestamp, method, full_path, body)
+    payload = f"{timestamp}{method}{full_path}{body}".encode()
+    public = Ed25519PublicKey.from_public_bytes(_urlsafe_b64decode(client.api_key))
+    public.verify(_urlsafe_b64decode(signature_b64), payload)
+
+
+def test_private_key_without_padding_still_loads():
+    key = Ed25519PrivateKey.generate()
+    private_b64 = base64.urlsafe_b64encode(key.private_bytes_raw()).decode().rstrip("=")
+    public_b64 = base64.urlsafe_b64encode(key.public_key().public_bytes_raw()).decode().rstrip("=")
+    client = NobitexClient(
+        api_key=public_b64,
+        api_secret=private_b64,
+        testnet=False,
+        quote_currency="IRT",
+    )
+    assert client.auth_method == "api_key"
+    assert client._sign_request("1", "GET", "/market/stats", "")
 
 
 def test_nobitex_balance_uses_rial_wallet_and_exposes_irt_alias(monkeypatch):
     client = _client()
     captured = {}
 
-    class Response:
-        status_code = 200
-        content = b"{}"
-        def raise_for_status(self):
-            pass
+    class Response(_Ok):
         def json(self):
             return {
                 "status": "ok",
                 "wallets": [
-                    {"currency": "rls", "balance": "125000000", "blockedBalance": "1000000"},
+                    {
+                        "currency": "rls",
+                        "balance": "125000000",
+                        "blockedBalance": "1000000",
+                        "activeBalance": "124000000",
+                    },
                     {"currency": "btc", "balance": "0.0123"},
                 ],
             }
@@ -68,18 +103,35 @@ def test_nobitex_balance_uses_rial_wallet_and_exposes_irt_alias(monkeypatch):
         return Response()
 
     monkeypatch.setattr(client._session, "request", fake_request)
-    assert client.get_balance("IRT") == 125000000.0
-    assert client.get_balance("RLS") == 125000000.0
+    assert client.get_balance("IRT") == 124000000.0
+    assert client.get_balance("RLS") == 124000000.0
     assert captured["url"] == "https://apiv2.nobitex.ir/users/wallets/list"
+    assert captured["method"] == "POST"
+    assert json.loads(captured["data"]) == {"type": "spot"}
+    assert captured["headers"]["User-Agent"] == USER_AGENT
+    assert "Authorization" not in captured["headers"]
+
+
+def test_wallet_spendable_subtracts_blocked_when_active_missing(monkeypatch):
+    client = _client()
+
+    class Response(_Ok):
+        def json(self):
+            return {
+                "status": "ok",
+                "wallets": [
+                    {"currency": "rls", "balance": "125000000", "blockedBalance": "1000000"},
+                ],
+            }
+
+    monkeypatch.setattr(client._session, "request", lambda *a, **k: Response())
+    assert client.get_balance("IRT") == 124000000.0
 
 
 def test_all_irt_market_stats_are_normalized(monkeypatch):
     client = _client()
     def fake_get(url, headers=None, timeout=None):
-        class Response:
-            status_code = 200
-            content = b"{}"
-            def raise_for_status(self): pass
+        class Response(_Ok):
             def json(self):
                 return {"status":"ok","stats":{
                     "vtho-rls":{"isClosed":False,"latest":"1200","bestBuy":"1199","bestSell":"1201","volumeDst":"50000000","dayChange":"8.2"},
@@ -97,18 +149,72 @@ def test_all_irt_market_stats_are_normalized(monkeypatch):
 def test_low_price_stop_price_keeps_precision(monkeypatch):
     client = _client()
     captured = {}
-    class Response:
-        status_code = 200
-        content = b"{}"
-        def raise_for_status(self): pass
+    class Response(_Ok):
         def json(self):
-            return {"status":"ok","order":{"id":123,"status":"Inactive","execution":"StopMarket","amount":"1000","matchedAmount":"0","price":"market"}}
+            return {
+                "status": "ok",
+                "order": {
+                    "id": 123,
+                    "status": "Inactive",
+                    "execution": "StopMarket",
+                    "amount": "1000",
+                    "matchedAmount": "0",
+                    "price": "market",
+                    "market": "VTHO-RLS",
+                },
+            }
     def fake_request(method, url, headers=None, data=None, timeout=None):
         captured["data"] = json.loads(data)
+        captured["headers"] = headers
         return Response()
     monkeypatch.setattr(client._session, "request", fake_request)
-    client.place_order("VTHOIRT", "sell", "stop_market", 1000, stop_price=0.00067225)
+    order = client.place_order("VTHOIRT", "sell", "stop_market", 1000, stop_price=0.00067225)
     assert captured["data"]["stopPrice"] == "0.00067225"
+    assert "price" not in captured["data"]
+    assert captured["data"]["execution"] == "stop_market"
+    assert captured["data"]["dstCurrency"] == "rls"
+    assert re.fullmatch(r"[A-Za-z0-9-]{1,32}", captured["data"]["clientOrderId"])
+    assert order["status"] == "open"
+    assert order["symbol"] == "VTHOIRT"
+
+
+def test_open_orders_use_documented_query_params(monkeypatch):
+    client = _client()
+    captured = {}
+
+    class Response(_Ok):
+        def json(self):
+            return {"status": "ok", "orders": []}
+
+    def fake_get(url, headers=None, timeout=None):
+        captured["url"] = url
+        return Response()
+
+    monkeypatch.setattr(client._session, "get", fake_get)
+    client.get_open_orders("BTCIRT")
+    assert "/market/orders/list?" in captured["url"]
+    assert "status=open" in captured["url"]
+    assert "details=2" in captured["url"]
+    assert "tradeType=spot" in captured["url"]
+    assert "srcCurrency=btc" in captured["url"]
+    assert "dstCurrency=rls" in captured["url"]
+    assert "market=" not in captured["url"]
+
+
+def test_http_200_failed_status_raises():
+    client = _client()
+
+    class Response(_Ok):
+        def json(self):
+            return {"status": "failed", "code": "InvalidSignature", "message": "bad"}
+
+    client._session.get = lambda *a, **k: Response()
+    try:
+        client._request("GET", "/market/orders/list", signed=True)
+        assert False, "expected AuthenticationError"
+    except Exception as exc:
+        from trading.exceptions import AuthenticationError
+        assert isinstance(exc, AuthenticationError)
 
 
 def test_bare_base_symbols_resolve_to_irt_pairs():
@@ -121,17 +227,15 @@ def test_bare_base_symbols_resolve_to_irt_pairs():
     assert client._split_symbol("PROM") == ("PROM", "IRT")
     assert client._split_symbol("PROMIRT") == ("PROM", "IRT")
     assert client._split_symbol("DOGE") != ("D", "OGE")
+    assert client._normalize_market_symbol("BTC-RLS") == "BTCIRT"
+    assert client._normalize_market_symbol("BTC-USDT") == "BTCUSDT"
 
 
 def test_is_symbol_supported_queries_full_base(monkeypatch):
     client = _client()
     captured = {}
 
-    class Response:
-        status_code = 200
-        content = b"{}"
-        def raise_for_status(self):
-            pass
+    class Response(_Ok):
         def json(self):
             return {
                 "status": "ok",
@@ -162,3 +266,13 @@ def test_trader_appends_irt_to_bare_base():
     assert TradingBot.normalize_symbol_for_execution(bot, "PROM") == "PROMIRT"
     assert TradingBot.normalize_symbol_for_execution(bot, "DOGE") == "DOGEIRT"
     assert TradingBot.normalize_symbol_for_execution(bot, "BTCIRT") == "BTCIRT"
+
+
+def test_bot_settings_describe_nobitex_key_fields():
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "gui/panels/real_trading_panel.py").read_text(encoding="utf-8")
+    assert "Nobitex public key" in src
+    assert "Nobitex private key" in src
+    assert "READ,TRADE" in src
+    assert "WITHDRAW" in src
+    assert "تومان" not in src

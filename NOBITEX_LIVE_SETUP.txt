@@ -46,9 +46,14 @@ No trading strategy can guarantee profit or pay for a trip. The purpose of this 
 reliable execution, continuous monitoring of real CoinMarketCap and Nobitex prices, and
 risk containment — not guaranteed returns.
 
-Keep the API key restricted to trading only. Do not enable withdrawals for the bot key.
+Keep the API key restricted to READ,TRADE only. Do not enable WITHDRAW for the bot key.
+The PC clock must stay within 30 seconds of UTC or Nobitex-Timestamp authentication fails.
 Start with a small allocation and verify one real order + one protective stop before
 leaving the computer unattended.
+
+Create the key at https://apidocs.nobitex.ir/api_key/api-key-guide (Nobitex panel /
+POST /apikeys/create). Paste the public `key` and the one-time `privateKey`.
+The client sends User-Agent TraderBot/CryptoScanner-<version> on every request.
 
 The distribution ZIP intentionally does NOT include private credentials from the
 original secrets/ directory.

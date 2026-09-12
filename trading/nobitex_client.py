@@ -1,20 +1,13 @@
 """
-trading/nobitex_client.py — Nobitex adapter v6.3.1
-==================================================
+trading/nobitex_client.py — Nobitex adapter
 
-Drop-in replacement for the project's Nobitex client.
+Auth follows the official API-key guide:
+https://apidocs.nobitex.ir/api_key/api-key-guide
 
-Fixes vs the previous cache / fill-detection version:
-- get_balance_fresh() bypasses the 5-minute wallet cache.
-- Failed balance reads never collapse to 0.0 at this layer's caller
-  (get_balances raises; missing coin in a loaded snapshot is 0).
-- cancel_order / get_order_status accept (order_id, symbol) like
-  ExchangeBase AND the legacy (symbol, order_id) call shape.
-- Active market orders stay "open" unless matchedAmount is actually > 0;
-  unmatchedAmount is not assumed 0 when the field is absent.
-- get_ticker includes "price" for SignalTracker.
-- Symbol-support network failures are not cached as False forever.
-- Wallet cache is lock-protected and fully cleared on invalidate.
+- Nobitex-Key / Nobitex-Signature / Nobitex-Timestamp (never Authorization)
+- Ed25519 over timestamp + METHOD + full_path + raw_body
+- User-Agent TraderBot/<name-and-version> on every request
+- Spot paths only: READ for wallets/orders, TRADE for add/cancel
 """
 from __future__ import annotations
 
@@ -30,6 +23,7 @@ from urllib.parse import urlencode
 import requests
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
+from core.config import APP_NAME, APP_VERSION
 from .exchange_base import ExchangeBase
 from .exceptions import (
     AuthenticationError,
@@ -40,6 +34,9 @@ from .exceptions import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Official bot identification: TraderBot/<name-and-version>
+USER_AGENT = f"TraderBot/{APP_NAME}-{APP_VERSION}"
 
 _QUOTE_SUFFIXES = ("USDT", "USDC", "IRT", "RLS", "BTC", "ETH")
 _EXECUTION_MAP = {
@@ -92,9 +89,26 @@ def _coerce_order_ref(order_id: Optional[str], symbol: Optional[str]) -> Tuple[s
     return str(order_id), None if symbol is None else str(symbol)
 
 
+def _wallet_spendable(wallet: Dict[str, Any]) -> float:
+    """Prefer documented activeBalance; otherwise total minus blockedBalance."""
+    active = wallet.get("activeBalance")
+    if active not in (None, ""):
+        return _safe_float(active)
+    total = _safe_float(wallet.get("balance", wallet.get("available", 0)))
+    blocked = _safe_float(wallet.get("blockedBalance", 0))
+    return max(0.0, total - blocked)
+
+
 def _fmt_money(value: float) -> str:
     text = f"{float(value):.12f}".rstrip("0").rstrip(".")
     return text or "0"
+
+
+def _urlsafe_b64decode(value: str) -> bytes:
+    """Decode Nobitex urlsafe Base64 keys, including values missing padding."""
+    raw = (value or "").strip().encode("ascii")
+    raw += b"=" * ((4 - len(raw) % 4) % 4)
+    return base64.urlsafe_b64decode(raw)
 
 
 class NobitexClient(ExchangeBase):
@@ -117,6 +131,10 @@ class NobitexClient(ExchangeBase):
         self.auth_method = "anonymous"
         self.private_key = None
         self._session = requests.Session()
+        self._session.headers.update({
+            "Accept": "application/json",
+            "User-Agent": USER_AGENT,
+        })
         self._lock = threading.RLock()
 
         self._symbol_support_cache: Dict[str, bool] = {}
@@ -133,7 +151,7 @@ class NobitexClient(ExchangeBase):
 
         if key_present and secret_present:
             try:
-                private_bytes = base64.urlsafe_b64decode(api_secret.strip())
+                private_bytes = _urlsafe_b64decode(api_secret)
                 if len(private_bytes) != 32:
                     raise ValueError(f"Ed25519 seed must be 32 bytes, got {len(private_bytes)}")
                 self.private_key = Ed25519PrivateKey.from_private_bytes(private_bytes)
@@ -180,9 +198,14 @@ class NobitexClient(ExchangeBase):
             full_path = path
 
         timestamp = str(int(time.time()))
-        raw_body = json.dumps(body, separators=(",", ":")) if body is not None else ""
+        raw_body = json.dumps(body, separators=(",", ":"), ensure_ascii=False) if body is not None else ""
 
-        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": USER_AGENT,
+        }
+        if raw_body:
+            headers["Content-Type"] = "application/json"
         if signed:
             if not self.private_key or not self.api_key:
                 raise AuthenticationError("Nobitex API key authentication is not configured.")
@@ -202,49 +225,69 @@ class NobitexClient(ExchangeBase):
                 resp = self._session.request(
                     method, url, headers=headers, data=raw_body or None, timeout=self.timeout,
                 )
-            resp.raise_for_status()
-            payload = resp.json() if resp.content else {}
-            return payload if isinstance(payload, dict) else {"raw": payload}
-        except requests.exceptions.HTTPError as e:
-            error_data: Dict[str, Any] = {}
+            payload: Dict[str, Any]
             try:
-                error_data = resp.json() or {}
+                payload = resp.json() if resp.content else {}
             except Exception:
-                error_data = {}
+                payload = {}
+            if not isinstance(payload, dict):
+                payload = {"raw": payload}
 
-            error_code = str(error_data.get("code", "") or "")
-            error_msg = str(error_data.get("message", "") or "")
-            status_code = getattr(resp, "status_code", None)
-
-            if status_code == 400 and error_code == "InvalidCurrency":
-                logger.debug(
-                    "Nobitex InvalidCurrency (expected during symbol check): %s",
-                    error_msg,
-                )
-                raise
-
-            logger.error("Nobitex API error: %s", e)
-            if error_data:
-                logger.error("Error response: %s", error_data)
-
-            if status_code == 401:
-                self.mark_auth_failed("Nobitex authentication failed (HTTP 401).")
-                raise AuthenticationError("Nobitex authentication failed (HTTP 401).") from e
-            if status_code == 403:
-                self.mark_authorization_failed("Nobitex authorization failed (HTTP 403).")
-                raise AuthorizationError("Nobitex authorization failed (HTTP 403).") from e
-            if status_code == 429:
-                err = RateLimitError("Nobitex rate limit exceeded (HTTP 429).")
-                err.status_code = 429
-                raise err from e
-            if status_code is not None and 500 <= status_code <= 599:
-                raise ServerExchangeError(
-                    f"Nobitex server error (HTTP {status_code}).", status_code=status_code,
-                ) from e
+            if resp.status_code >= 400:
+                self._raise_api_error(resp, payload, http_error=True)
+            # Some older paths return HTTP 200 with status=failed.
+            if str(payload.get("status", "")).lower() == "failed":
+                self._raise_api_error(resp, payload, http_error=False)
+            return payload
+        except (AuthenticationError, AuthorizationError, RateLimitError, ServerExchangeError):
+            raise
+        except requests.exceptions.HTTPError:
             raise
         except requests.exceptions.RequestException as e:
             logger.error("Nobitex request failed: %s", e)
             raise NetworkExchangeError("Nobitex network error.") from e
+
+    def _raise_api_error(self, resp: Any, error_data: Dict[str, Any], *, http_error: bool) -> None:
+        error_code = str(error_data.get("code", "") or "")
+        error_msg = str(error_data.get("message", "") or "")
+        status_code = getattr(resp, "status_code", None)
+        backoff = error_data.get("backOff")
+
+        if status_code == 400 and error_code == "InvalidCurrency":
+            logger.debug(
+                "Nobitex InvalidCurrency (expected during symbol check): %s",
+                error_msg,
+            )
+            resp.raise_for_status()
+
+        logger.error("Nobitex API error: HTTP %s code=%s message=%s", status_code, error_code, error_msg)
+        if error_data:
+            logger.error("Error response: %s", error_data)
+
+        if status_code == 401 or error_code in ("Unauthorized", "AuthenticationFailed", "InvalidSignature"):
+            hint = (
+                "Nobitex authentication failed. Check public key (Nobitex-Key), "
+                "private key, and that the PC clock is within 30 seconds of UTC."
+            )
+            self.mark_auth_failed(hint)
+            raise AuthenticationError(hint)
+        if status_code == 403:
+            self.mark_authorization_failed("Nobitex authorization failed (HTTP 403). Missing READ or TRADE permission?")
+            raise AuthorizationError("Nobitex authorization failed (HTTP 403).")
+        if status_code == 429 or error_code == "TooManyRequests":
+            wait = f" Wait {backoff}s." if backoff not in (None, "") else ""
+            err = RateLimitError(f"Nobitex rate limit exceeded.{wait}")
+            err.status_code = 429
+            raise err
+        if status_code is not None and 500 <= int(status_code) <= 599:
+            raise ServerExchangeError(
+                f"Nobitex server error (HTTP {status_code}).", status_code=status_code,
+            )
+        if http_error:
+            resp.raise_for_status()
+        raise RuntimeError(
+            f"Nobitex request failed: {error_code or 'failed'} {error_msg}".strip()
+        )
 
     def resolve_symbol(self, symbol: str) -> str:
         if not symbol:
@@ -403,7 +446,9 @@ class NobitexClient(ExchangeBase):
 
         logger.info("Requesting Nobitex wallets list (auth_method=%s)...", self.auth_method)
         try:
-            data = self._request("POST", "/users/wallets/list", body={}, signed=True)
+            data = self._request("POST", "/users/wallets/list", body={"type": "spot"}, signed=True)
+            if str(data.get("status", "")).lower() not in ("ok", ""):
+                raise RuntimeError(f"Nobitex wallets list failed: {data.get('message', data)}")
             wallets = data.get("wallets", [])
             balances: Dict[str, float] = {}
             for wallet in wallets:
@@ -412,8 +457,7 @@ class NobitexClient(ExchangeBase):
                 asset = str(wallet.get("currency", "")).upper()
                 if not asset:
                     continue
-                raw_balance = wallet.get("balance", wallet.get("available", 0))
-                value = _safe_float(raw_balance)
+                value = _wallet_spendable(wallet)
                 balances[asset] = value
                 if asset == "RLS":
                     balances["IRT"] = value
@@ -485,7 +529,7 @@ class NobitexClient(ExchangeBase):
         order_type = order_type.lower().strip()
         execution = _EXECUTION_MAP.get(order_type, order_type)
 
-        client_order_id = str(random.randint(1_000_000_000, 9_999_999_999))
+        client_order_id = f"cs{int(time.time() * 1000)}{random.randint(100, 999)}"
 
         body = {
             "type": side,
@@ -500,7 +544,21 @@ class NobitexClient(ExchangeBase):
             if price is None:
                 raise ValueError("Price is required for limit orders.")
             body["price"] = _fmt_money(price)
-        elif execution in ("market", "stop_market", "stop_limit"):
+        elif execution == "market":
+            if price is not None:
+                body["price"] = _fmt_money(price)
+        elif execution == "stop_market":
+            if stop_price is None:
+                raise ValueError("stopPrice is required for stop_market orders.")
+            body["stopPrice"] = _fmt_money(stop_price)
+        elif execution == "stop_limit":
+            if price is None:
+                raise ValueError("Price is required for stop_limit orders.")
+            if stop_price is None:
+                raise ValueError("stopPrice is required for stop_limit orders.")
+            body["price"] = _fmt_money(price)
+            body["stopPrice"] = _fmt_money(stop_price)
+        else:
             if price is not None:
                 body["price"] = _fmt_money(price)
             if stop_price is not None:
@@ -512,9 +570,6 @@ class NobitexClient(ExchangeBase):
         data = self._request("POST", "/market/orders/add", body=body, signed=True)
         logger.info("Place order response: %s", data)
 
-        if data.get("status") == "failed":
-            raise RuntimeError(f"Order placement failed: {data.get('message', '')}")
-
         self.invalidate_balance_cache()
         return self._parse_order(data.get("order", data))
 
@@ -525,22 +580,37 @@ class NobitexClient(ExchangeBase):
             "status": "canceled",
         }
         data = self._request("POST", "/market/orders/update-status", body=body, signed=True)
-        if data.get("status") == "failed":
-            raise RuntimeError(f"Cancel failed: {data.get('message', '')}")
         self.invalidate_balance_cache()
         return {"order_id": oid, "status": "canceled", "raw": data}
 
-    def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:
-        query = {}
+    def _order_list_query(
+        self,
+        *,
+        symbol: Optional[str] = None,
+        status: str = "open",
+        page_size: int = 100,
+    ) -> Dict[str, Any]:
+        query: Dict[str, Any] = {
+            "status": status,
+            "details": 2,
+            "tradeType": "spot",
+            "pageSize": max(1, min(int(page_size or 100), 1000)),
+        }
         if symbol:
-            query["market"] = self.resolve_symbol(symbol)
-        data = self._request("GET", "/market/orders/list", query_params=query, signed=True)
+            market_symbol = self.resolve_symbol(symbol)
+            base, quote = self._split_symbol(market_symbol)
+            query["srcCurrency"] = base.lower()
+            query["dstCurrency"] = self._map_quote(quote)
+        return query
+
+    def get_open_orders(self, symbol: Optional[str] = None) -> List[Dict]:
+        data = self._request(
+            "GET", "/market/orders/list",
+            query_params=self._order_list_query(symbol=symbol, status="open"),
+            signed=True,
+        )
         orders = data.get("orders", [])
-        return [
-            self._parse_order(o)
-            for o in orders
-            if str(o.get("status") or "").lower() in ("active", "new", "open", "partial")
-        ]
+        return [self._parse_order(o) for o in orders]
 
     def get_order_status(self, order_id: str, symbol: Optional[str] = None) -> Dict:
         oid, _sym = _coerce_order_ref(order_id, symbol)
@@ -550,10 +620,11 @@ class NobitexClient(ExchangeBase):
         return self._parse_order(order)
 
     def get_order_history(self, symbol: Optional[str] = None, limit: int = 100) -> List[Dict]:
-        query: Dict[str, Any] = {"limit": limit}
-        if symbol:
-            query["market"] = self.resolve_symbol(symbol)
-        data = self._request("GET", "/market/orders/list", query_params=query, signed=True)
+        data = self._request(
+            "GET", "/market/orders/list",
+            query_params=self._order_list_query(symbol=symbol, status="all", page_size=limit),
+            signed=True,
+        )
         orders = data.get("orders", [])
         return [self._parse_order(o) for o in orders[:limit]]
 
@@ -575,6 +646,17 @@ class NobitexClient(ExchangeBase):
         if quote.upper() in ("IRT", "RLS"):
             return "rls"
         return quote.lower()
+
+    def _normalize_market_symbol(self, market: str) -> str:
+        text = str(market or "").upper().replace("_", "").replace("/", "").replace(" ", "")
+        if "-" in text:
+            base, quote = text.split("-", 1)
+            if quote in ("RLS", "IRT", "IRR"):
+                return f"{base}IRT"
+            return f"{base}{quote}"
+        if text:
+            return self.resolve_symbol(text)
+        return ""
 
     def _is_quote_asset(self, asset: str) -> bool:
         key = (asset or "").upper()
@@ -612,7 +694,7 @@ class NobitexClient(ExchangeBase):
             status = "filled"
         elif status_raw in ("canceled", "cancelled", "rejected"):
             status = "canceled"
-        elif status_raw in ("new", "active", "open", "pending"):
+        elif status_raw in ("new", "active", "open", "pending", "inactive"):
             if matched_amount > 0 and unmatched_present and unmatched_amount == 0:
                 status = "filled"
             elif matched_amount > 0:
@@ -646,7 +728,9 @@ class NobitexClient(ExchangeBase):
 
         return {
             "order_id": order_id,
-            "symbol": raw.get("market") or raw.get("symbol") or "",
+            "symbol": self._normalize_market_symbol(
+                raw.get("market") or raw.get("symbol") or ""
+            ),
             "side": raw.get("type") or raw.get("side") or "",
             "type": order_type,
             "price": price,
@@ -670,6 +754,7 @@ class NobitexClient(ExchangeBase):
             "base_url": self.BASE_URL,
             "testnet": bool(self.testnet),
             "auth_method": self.auth_method,
+            "user_agent": USER_AGENT,
             "credentials_present": bool(self.api_key),
             "authentication_status": self.authentication_status,
             "balance_status": self.balance_status,
