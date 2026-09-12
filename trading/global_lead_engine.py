@@ -118,12 +118,12 @@ class GlobalLeadEngine:
         return (
             "local={local} cmc={matched} no_cmc={no_cmc} spread={spread} "
             "vol={volume} stale={stale} no_trend={no_trend} falling={falling} "
-            "fading={fading} passed={passed} btc_dump={btc_dump} "
-            "best_1h={best_1h} best_obs={best_obs}"
+            "fading={fading} confirm={confirm} chase={chase} passed={passed} "
+            "btc_dump={btc_dump} best_1h={best_1h} best_obs={best_obs}"
         ).format(**{k: s.get(k, 0) for k in (
             "local", "matched", "no_cmc", "spread", "volume", "stale",
-            "no_trend", "falling", "fading", "passed", "btc_dump",
-            "best_1h", "best_obs",
+            "no_trend", "falling", "fading", "confirm", "chase", "passed",
+            "btc_dump", "best_1h", "best_obs",
         )})
 
     @staticmethod

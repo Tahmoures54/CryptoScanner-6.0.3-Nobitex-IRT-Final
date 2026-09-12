@@ -61,7 +61,14 @@ from gui.dialogs.premium_window import PremiumWindow
 
 from signal_tracker import SignalTracker
 from trading.trader import TradingBot
-from trading.bot_config import load_config
+from trading.bot_config import (
+    DEFAULT_FIXED_POSITION_QUOTE,
+    DEFAULT_MAX_NOTIONAL_QUOTE,
+    DEFAULT_MAX_POSITION_PCT,
+    DEFAULT_MAX_TOTAL_EXPOSURE_PCT,
+    DEFAULT_MIN_NOTIONAL_QUOTE,
+    load_config,
+)
 from trading.global_lead_engine import GlobalLeadEngine
 
 from binance_data_provider import build_binance_dataframe
@@ -227,19 +234,7 @@ class CryptoScannerApp:
                 self.real_signal_tracker.trading_fee_pct = float(getattr(cfg, "trading_fee_pct", 0.1))
                 self.real_signal_tracker.max_open_trades = int(getattr(cfg, "max_open_positions", 3))
                 self.real_signal_tracker.max_new_entries_per_cycle = int(getattr(cfg, "max_new_entries_per_cycle", 1))
-                self.real_signal_tracker.position_size_mode = str(getattr(cfg, "position_size_mode", "fixed") or "fixed").lower()
-                self.real_signal_tracker.fixed_position_quote = float(getattr(cfg, "fixed_position_quote", 750000.0))
-                self.real_signal_tracker.max_position_pct = float(getattr(cfg, "max_position_pct", 25.0))
-                self.real_signal_tracker.min_notional_quote = float(getattr(cfg, "min_notional_quote", 300000.0))
-                self.real_signal_tracker.max_notional_quote = max(
-                    float(getattr(cfg, "max_position_pct", 25.0)) / 100.0 * live_cash,
-                    float(getattr(cfg, "fixed_position_quote", 750000.0)),
-                )
-                if self.real_signal_tracker.position_size_mode == "fixed":
-                    self.real_signal_tracker.fixed_position_quote = max(
-                        self.real_signal_tracker.fixed_position_quote,
-                        self.real_signal_tracker.min_notional_quote,
-                    )
+                self._apply_live_sizing(cfg, live_cash=live_cash)
                 self.real_signal_tracker.auto_trading_enabled = True
                 self.real_signal_tracker.ignore_signal_filters = True
                 self.real_signal_tracker.confirmation_enabled = bool(getattr(cfg, "confirmation_enabled", False))
@@ -247,13 +242,16 @@ class CryptoScannerApp:
                 self.real_signal_tracker.confirmation_max_minutes = int(getattr(cfg, "confirmation_max_minutes", 8))
                 self.real_signal_tracker.invalidation_pct = float(getattr(cfg, "invalidation_pct", 1.0))
                 self.real_signal_tracker.max_chase_pct = float(getattr(cfg, "max_chase_pct", 1.0))
-                self.real_signal_tracker.max_total_exposure_pct = float(getattr(cfg, "max_total_exposure_pct", 50.0))
                 self.real_signal_tracker.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 900))
                 self.real_signal_tracker.trailing_stop_enabled = bool(getattr(cfg, "trailing_stop_enabled", True))
                 self.real_signal_tracker.take_profit_percent = float(getattr(cfg, "take_profit_percent", 0.0))
                 self.real_signal_tracker._sync_balance_from_executor()
                 if self.real_auto_enabled:
-                    logger.info("[REAL] Automatic Nobitex trading connected to live SignalTracker.")
+                    logger.info(
+                        "[REAL] Automatic Nobitex trading connected | size=%.0f IRT | mode=%s",
+                        self.real_signal_tracker.fixed_position_quote,
+                        self.real_signal_tracker.position_size_mode,
+                    )
                 else:
                     logger.info("[REAL] Live Nobitex tracker ready for SEND; 30s auto-scan is off.")
             else:
@@ -264,13 +262,54 @@ class CryptoScannerApp:
             self.real_signal_tracker = None
             self.real_auto_enabled = False
 
+    def _apply_live_sizing(self, cfg, live_cash: Optional[float] = None) -> None:
+        """Keep paper and real trackers on the configured Rial lot size."""
+        if cfg is None:
+            return
+        size = float(getattr(cfg, "fixed_position_quote", DEFAULT_FIXED_POSITION_QUOTE) or DEFAULT_FIXED_POSITION_QUOTE)
+        min_n = float(getattr(cfg, "min_notional_quote", DEFAULT_MIN_NOTIONAL_QUOTE) or 0.0)
+        max_n = max(
+            float(getattr(cfg, "max_notional_quote", DEFAULT_MAX_NOTIONAL_QUOTE) or 0.0),
+            size,
+        )
+        mode = str(getattr(cfg, "position_size_mode", "fixed") or "fixed").lower()
+        max_pct = float(getattr(cfg, "max_position_pct", DEFAULT_MAX_POSITION_PCT) or DEFAULT_MAX_POSITION_PCT)
+        exposure = float(
+            getattr(cfg, "max_total_exposure_pct", DEFAULT_MAX_TOTAL_EXPOSURE_PCT)
+            or DEFAULT_MAX_TOTAL_EXPOSURE_PCT
+        )
+        trackers = [self.real_signal_tracker, self.signal_tracker]
+        for st in trackers:
+            if st is None:
+                continue
+            st.position_size_mode = mode
+            st.fixed_position_quote = size
+            st.min_notional_quote = min_n
+            st.max_notional_quote = max_n
+            st.max_position_pct = max_pct
+            st.max_total_exposure_pct = exposure
+            if mode == "fixed":
+                st.fixed_position_quote = max(st.fixed_position_quote, st.min_notional_quote)
+        if live_cash is not None and self.real_signal_tracker is not None:
+            self.real_signal_tracker.max_notional_quote = max(
+                self.real_signal_tracker.max_notional_quote,
+                self.real_signal_tracker.fixed_position_quote,
+            )
+
     def _configure_paper_tracker(self) -> None:
         """Paper tracker shadows the live engine with simulated fills."""
         st = self.signal_tracker
         if st is None:
             return
         cfg = self._bot_cfg
-        cash = 10_000_000.0
+        size = float(
+            getattr(cfg, "fixed_position_quote", DEFAULT_FIXED_POSITION_QUOTE) or DEFAULT_FIXED_POSITION_QUOTE
+        ) if cfg is not None else DEFAULT_FIXED_POSITION_QUOTE
+        cash = max(
+            float(getattr(cfg, "account_balance", 0.0) or 0.0) if cfg is not None else 0.0,
+            size / 0.90,
+            38_000_000.0,
+        )
         if self.trading_bot:
             cash = max(float(getattr(self.trading_bot, "current_balance", 0.0) or 0.0), cash)
         st.quote_currency = "IRT"
@@ -288,9 +327,6 @@ class CryptoScannerApp:
             st.max_open_trades = int(
                 getattr(cfg, "max_open_positions", getattr(cfg, "max_open_trades", 3)) or 3
             )
-            st.position_size_mode = str(getattr(cfg, "position_size_mode", "fixed") or "fixed").lower()
-            st.fixed_position_quote = float(getattr(cfg, "fixed_position_quote", 750000.0) or 750000.0)
-            st.min_notional_quote = float(getattr(cfg, "min_notional_quote", 300000.0) or 0.0)
             st.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 2.2) or 2.2)
             st.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 4.0) or 4.0)
             st.trailing_activation_pct = float(getattr(cfg, "trailing_activation_pct", 1.5) or 1.5)
@@ -299,6 +335,7 @@ class CryptoScannerApp:
             st.trading_fee_pct = float(getattr(cfg, "trading_fee_pct", 0.1) or 0.1)
             st.max_new_entries_per_cycle = int(getattr(cfg, "max_new_entries_per_cycle", 1) or 1)
             st.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 900) or 0)
+            self._apply_live_sizing(cfg, live_cash=cash)
         logger.info(
             "[PAPER] Trend shadow ready | size=%.0f SL=%.2f trail=%.2f act=%.2f TP=%.2f",
             st.fixed_position_quote, st.stop_loss_pct, st.trailing_distance_pct,
@@ -523,6 +560,7 @@ class CryptoScannerApp:
                 cfg = self._bot_cfg
             if cfg is not None:
                 self._configure_global_lead_engine(cfg)
+                self._apply_live_sizing(cfg)
             if not self.real_auto_enabled:
                 logger.debug("[REAL] Auto entries disabled; monitoring open Nobitex positions only.")
             elif self.cmc_client is None:

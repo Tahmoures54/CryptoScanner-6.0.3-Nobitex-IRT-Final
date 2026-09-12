@@ -53,11 +53,11 @@ class PaperTradingPanel(tk.Frame):
 
     # Default values for paper trade settings (not shown in UI)
     DEFAULT_PAPER_SETTINGS = {
-        "size": "750000",
+        "size": "10000000",
         "tp": "0",
         "sl": "2.2",
         "max_open": "3",
-        "capital": "10000000",
+        "capital": "38000000",
         "trailing_enabled": True,
         "trailing_distance": "4.0",
         "trailing_activation": "1.5",
@@ -140,10 +140,10 @@ class PaperTradingPanel(tk.Frame):
                 )
                 self.tracker.position_size_mode = "fixed"
                 self.tracker.fixed_position_quote = float(
-                    getattr(cfg, "fixed_position_quote", 750000.0) or 750000.0
+                    getattr(cfg, "fixed_position_quote", 10000000.0) or 10000000.0
                 )
                 return
-            size = float(settings.get("size", 750000))
+            size = float(settings.get("size", 10000000))
             tp = float(settings.get("tp", 0.0))
             sl = float(settings.get("sl", 2.2))
             max_open = int(settings.get("max_open", 3))
