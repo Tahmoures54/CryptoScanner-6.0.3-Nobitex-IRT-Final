@@ -93,23 +93,43 @@ def test_observed_live_pump_can_enter_without_cmc_1h():
     assert out[0]["ObservedGlobalMove (%)"] > 3.0
 
 
+def _weak_confirm_engine():
+    return GlobalLeadEngine(
+        global_pump_pct=3,
+        min_observed_move_pct=0.6,
+        min_confirm_scans=2,
+        movement_lookback_scans=2,
+    )
+
+
 def test_trend_resets_when_move_disappears():
-    e = engine(global_pump_pct=3, min_confirm_scans=2)
-    first = e.evaluate(local(), cmc(), now=1000)
+    e = _weak_confirm_engine()
+    e.evaluate(local(), cmc(price=10.00, change=1.0), now=1000)
+    e.evaluate(local(), cmc(price=10.04, change=1.0), now=1015)
+    first = e.evaluate(local(), cmc(price=10.08, change=1.0), now=1030)
     assert first == []
     assert e._trend_hits.get("ABC") == 1
-    gone = e.evaluate(local(), cmc(change=0.2), now=1015)
+    gone = e.evaluate(local(), cmc(price=10.00, change=1.0), now=1045)
     assert gone == []
     assert "ABC" not in e._trend_hits
 
 
-def test_default_engine_needs_two_scans_to_confirm_trend():
-    e = GlobalLeadEngine(global_pump_pct=3, min_confirm_scans=2, movement_lookback_scans=2)
-    first = e.evaluate(local(), cmc(), now=1000)
+def test_weak_trend_needs_two_scans_to_confirm():
+    e = _weak_confirm_engine()
+    e.evaluate(local(), cmc(price=10.00, change=1.0), now=1000)
+    e.evaluate(local(), cmc(price=10.04, change=1.0), now=1015)
+    first = e.evaluate(local(), cmc(price=10.08, change=1.0), now=1030)
     assert first == []
-    second = e.evaluate(local(), cmc(), now=1015)
+    second = e.evaluate(local(), cmc(price=10.14, change=1.0), now=1045)
     assert len(second) == 1
     assert "Trend Buy" in second[0]["Signal"]
+
+
+def test_strong_1h_enters_on_first_scan_even_with_confirm_2():
+    e = GlobalLeadEngine(global_pump_pct=1.2, min_confirm_scans=2, movement_lookback_scans=2)
+    out = e.evaluate(local(), cmc(change=6.0), now=1000)
+    assert len(out) == 1
+    assert "Trend Buy" in out[0]["Signal"]
 
 
 def test_local_already_running_does_not_block_entry():
@@ -228,7 +248,7 @@ def test_wide_spread_is_rejected():
     assert out == []
 
 
-def test_old_config_without_version_gets_asymmetric_defaults(tmp_path):
+def test_old_config_without_version_gets_early_trend_defaults(tmp_path):
     path = tmp_path / "old.json"
     path.write_text(
         '{"exchange": "nobitex", "global_pump_threshold_pct": 1.2, '
@@ -236,30 +256,158 @@ def test_old_config_without_version_gets_asymmetric_defaults(tmp_path):
         encoding="utf-8",
     )
     loaded = load_config(str(path))
-    assert loaded.global_pump_threshold_pct == 2.0
-    assert loaded.max_nobitex_spread_pct == 1.0
-    assert loaded.trailing_distance_pct == 4.0
-    assert loaded.stop_loss_pct == 2.2
+    assert loaded.global_pump_threshold_pct == 1.2
+    assert loaded.min_observed_move_pct == 0.7
+    assert loaded.max_nobitex_spread_pct == 1.2
+    assert loaded.trailing_distance_pct == 1.6
+    assert loaded.trailing_activation_pct == 0.8
+    assert loaded.stop_loss_pct == 1.8
+    assert loaded.min_confirm_scans == 1
+    assert loaded.movement_lookback_scans == 4
     assert loaded.take_profit_percent == 0.0
-    assert loaded.strategy_defaults_version == 3
+    assert loaded.strategy_defaults_version == 4
     assert loaded.fixed_position_quote == 10_000_000.0
 
 
-def test_saved_v2_config_keeps_strategy_but_raises_lot_size(tmp_path):
+def test_saved_v2_config_gets_early_trend_and_lot_size(tmp_path):
     cfg = BotConfig.from_dict({
         "strategy_defaults_version": 2,
         "global_pump_threshold_pct": 1.8,
         "max_nobitex_spread_pct": 0.8,
         "trailing_distance_pct": 5.0,
+        "fixed_position_quote": 10_000_000.0,
     })
     path = str(tmp_path / "v2.json")
     assert save_config(cfg, path)
     loaded = load_config(path)
-    assert loaded.global_pump_threshold_pct == 1.8
-    assert loaded.max_nobitex_spread_pct == 0.8
-    assert loaded.trailing_distance_pct == 5.0
-    assert loaded.strategy_defaults_version == 3
+    assert loaded.global_pump_threshold_pct == 1.2
+    assert loaded.max_nobitex_spread_pct == 1.2
+    assert loaded.trailing_distance_pct == 1.6
+    assert loaded.stop_loss_pct == 1.8
+    assert loaded.strategy_defaults_version == 4
     assert loaded.position_size_mode == "fixed"
     assert loaded.fixed_position_quote == 10_000_000.0
     assert loaded.max_notional_quote == 10_000_000.0
+
+
+def test_saved_v3_config_gets_early_trend_and_keeps_lot_size(tmp_path):
+    cfg = BotConfig.from_dict({
+        "strategy_defaults_version": 3,
+        "global_pump_threshold_pct": 2.0,
+        "min_observed_move_pct": 1.2,
+        "max_nobitex_spread_pct": 1.0,
+        "movement_lookback_scans": 8,
+        "min_confirm_scans": 2,
+        "stop_loss_pct": 2.2,
+        "trailing_distance_pct": 4.0,
+        "trailing_activation_pct": 1.5,
+        "fixed_position_quote": 10_000_000.0,
+        "max_notional_quote": 10_000_000.0,
+    })
+    path = str(tmp_path / "v3.json")
+    assert save_config(cfg, path)
+    loaded = load_config(path)
+    assert loaded.global_pump_threshold_pct == 1.2
+    assert loaded.min_observed_move_pct == 0.7
+    assert loaded.max_nobitex_spread_pct == 1.2
+    assert loaded.movement_lookback_scans == 4
+    assert loaded.min_confirm_scans == 1
+    assert loaded.stop_loss_pct == 1.8
+    assert loaded.trailing_distance_pct == 1.6
+    assert loaded.trailing_activation_pct == 0.8
+    assert loaded.strategy_defaults_version == 4
+    assert loaded.fixed_position_quote == 10_000_000.0
+    assert loaded.max_notional_quote == 10_000_000.0
+
+
+def test_saved_v4_config_keeps_custom_strategy(tmp_path):
+    cfg = BotConfig.from_dict({
+        "strategy_defaults_version": 4,
+        "global_pump_threshold_pct": 1.8,
+        "max_nobitex_spread_pct": 0.9,
+        "trailing_distance_pct": 2.5,
+        "fixed_position_quote": 10_000_000.0,
+    })
+    path = str(tmp_path / "v4.json")
+    assert save_config(cfg, path)
+    loaded = load_config(path)
+    assert loaded.global_pump_threshold_pct == 1.8
+    assert loaded.max_nobitex_spread_pct == 0.9
+    assert loaded.trailing_distance_pct == 2.5
+    assert loaded.strategy_defaults_version == 4
+    assert loaded.fixed_position_quote == 10_000_000.0
+
+
+def test_partial_history_measures_observed_move_before_full_lookback():
+    e = GlobalLeadEngine(
+        global_pump_pct=3,
+        min_observed_move_pct=0.7,
+        min_confirm_scans=1,
+        movement_lookback_scans=8,
+    )
+    for i, price in enumerate((10.0, 10.03, 10.06)):
+        assert e.evaluate(local(), cmc(price=price, change=0.5), now=1000 + i * 15) == []
+    out = e.evaluate(local(), cmc(price=10.20, change=0.5), now=1045)
+    assert len(out) == 1
+    assert out[0]["ObservedGlobalMove (%)"] >= 1.5
+
+
+def test_lookback_two_still_needs_two_history_points():
+    e = GlobalLeadEngine(
+        global_pump_pct=3,
+        min_observed_move_pct=0.6,
+        min_confirm_scans=1,
+        movement_lookback_scans=2,
+    )
+    e.evaluate(local(), cmc(price=10.0, change=0.5), now=1000)
+    out = e.evaluate(local(), cmc(price=10.20, change=0.5), now=1015)
+    assert out == []
+
+
+def test_moderately_wide_spread_allowed_when_local_and_move_are_strong():
+    e = engine(
+        global_pump_pct=3,
+        max_spread_pct=1.0,
+        min_observed_move_pct=0.7,
+        movement_lookback_scans=2,
+    )
+    e.evaluate(local(ask=1_000_000, bid=995_000, last=999_000), cmc(price=10.0, change=0.4), now=1000)
+    e.evaluate(local(ask=1_004_000, bid=999_000, last=1_003_000), cmc(price=10.08, change=0.4), now=1015)
+    out = e.evaluate(
+        local(ask=1_012_000, bid=1_000_000, last=1_011_000),
+        cmc(price=10.22, change=0.4),
+        now=1030,
+    )
+    assert len(out) == 1
+    assert out[0]["Nobitex Spread (%)"] > 1.0
+
+
+def test_fresh_bot_config_uses_early_trend_numbers():
+    cfg = BotConfig()
+    assert cfg.global_pump_threshold_pct == 1.2
+    assert cfg.min_observed_move_pct == 0.7
+    assert cfg.max_nobitex_spread_pct == 1.2
+    assert cfg.movement_lookback_scans == 4
+    assert cfg.min_confirm_scans == 1
+    assert cfg.stop_loss_pct == 1.8
+    assert cfg.trailing_distance_pct == 1.6
+    assert cfg.trailing_activation_pct == 0.8
+    assert cfg.max_chase_pct == 0.55
+    assert cfg.fixed_position_quote == 10_000_000.0
+    assert cfg.strategy_defaults_version == 4
+
+
+def test_moderately_wide_spread_rejected_when_local_is_flat():
+    e = engine(
+        global_pump_pct=3,
+        max_spread_pct=1.0,
+        min_observed_move_pct=0.7,
+        movement_lookback_scans=2,
+    )
+    row = local(ask=1_012_000, bid=1_000_000, last=1_011_000)
+    e.evaluate(row, cmc(price=10.0, change=6.0), now=1000)
+    e.evaluate(row, cmc(price=10.10, change=6.0), now=1015)
+    out = e.evaluate(row, cmc(price=10.22, change=6.0), now=1030)
+    assert out == []
+    assert e.last_stats["spread"] >= 1
 

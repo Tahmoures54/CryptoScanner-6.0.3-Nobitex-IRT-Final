@@ -226,10 +226,10 @@ class CryptoScannerApp:
                     or "IRT"
                 ).upper()
                 self.real_signal_tracker.pump_threshold_pct = 0.0
-                self.real_signal_tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 2.2))
-                self.real_signal_tracker.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 4.0))
+                self.real_signal_tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 1.8))
+                self.real_signal_tracker.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 1.6))
                 self.real_signal_tracker.trailing_activation_pct = float(
-                    getattr(cfg, "trailing_activation_pct", 1.5)
+                    getattr(cfg, "trailing_activation_pct", 0.8)
                 )
                 self.real_signal_tracker.trading_fee_pct = float(getattr(cfg, "trading_fee_pct", 0.1))
                 self.real_signal_tracker.max_open_trades = int(getattr(cfg, "max_open_positions", 3))
@@ -241,8 +241,8 @@ class CryptoScannerApp:
                 self.real_signal_tracker.confirmation_pct = float(getattr(cfg, "confirmation_pct", 0.35))
                 self.real_signal_tracker.confirmation_max_minutes = int(getattr(cfg, "confirmation_max_minutes", 8))
                 self.real_signal_tracker.invalidation_pct = float(getattr(cfg, "invalidation_pct", 1.0))
-                self.real_signal_tracker.max_chase_pct = float(getattr(cfg, "max_chase_pct", 1.0))
-                self.real_signal_tracker.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 900))
+                self.real_signal_tracker.max_chase_pct = float(getattr(cfg, "max_chase_pct", 0.55))
+                self.real_signal_tracker.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 480))
                 self.real_signal_tracker.trailing_stop_enabled = bool(getattr(cfg, "trailing_stop_enabled", True))
                 self.real_signal_tracker.take_profit_percent = float(getattr(cfg, "take_profit_percent", 0.0))
                 self.real_signal_tracker._sync_balance_from_executor()
@@ -327,14 +327,14 @@ class CryptoScannerApp:
             st.max_open_trades = int(
                 getattr(cfg, "max_open_positions", getattr(cfg, "max_open_trades", 3)) or 3
             )
-            st.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 2.2) or 2.2)
-            st.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 4.0) or 4.0)
-            st.trailing_activation_pct = float(getattr(cfg, "trailing_activation_pct", 1.5) or 1.5)
+            st.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 1.8) or 1.8)
+            st.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 1.6) or 1.6)
+            st.trailing_activation_pct = float(getattr(cfg, "trailing_activation_pct", 0.8) or 0.8)
             st.trailing_stop_enabled = bool(getattr(cfg, "trailing_stop_enabled", True))
             st.take_profit_percent = float(getattr(cfg, "take_profit_percent", 0.0) or 0.0)
             st.trading_fee_pct = float(getattr(cfg, "trading_fee_pct", 0.1) or 0.1)
             st.max_new_entries_per_cycle = int(getattr(cfg, "max_new_entries_per_cycle", 1) or 1)
-            st.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 900) or 0)
+            st.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 480) or 0)
             self._apply_live_sizing(cfg, live_cash=cash)
         logger.info(
             "[PAPER] Trend shadow ready | size=%.0f SL=%.2f trail=%.2f act=%.2f TP=%.2f",
@@ -364,20 +364,20 @@ class CryptoScannerApp:
             st.auto_trading_enabled = was
 
     def _configure_global_lead_engine(self, cfg) -> None:
-        raw_spread = float(getattr(cfg, "max_nobitex_spread_pct", 1.0) or 1.0)
+        raw_spread = float(getattr(cfg, "max_nobitex_spread_pct", 1.2) or 1.2)
         raw_age = float(getattr(cfg, "max_global_quote_age_sec", 300.0) or 300.0)
         kwargs = dict(
-            global_pump_pct=float(getattr(cfg, "global_pump_threshold_pct", 2.0)),
+            global_pump_pct=float(getattr(cfg, "global_pump_threshold_pct", 1.2)),
             max_spread_pct=max(0.2, raw_spread),
             min_global_volume_usd=float(getattr(cfg, "min_global_volume_usd", 1_000_000.0)),
             max_global_quote_age_sec=max(raw_age, 180.0),
             min_local_volume_irt=float(getattr(cfg, "min_volume_24h", 2_000_000.0)),
             max_local_fall_pct=float(getattr(cfg, "max_local_fall_pct", 0.8)),
-            max_chase_pct=float(getattr(cfg, "max_chase_pct", 0.7)),
-            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 8) or 8),
-            min_confirm_scans=int(getattr(cfg, "min_confirm_scans", 2) or 2),
-            min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 1.2)),
-            max_local_24h_pct=float(getattr(cfg, "max_local_24h_pct", 15.0)),
+            max_chase_pct=float(getattr(cfg, "max_chase_pct", 0.55)),
+            movement_lookback_scans=int(getattr(cfg, "movement_lookback_scans", 4) or 4),
+            min_confirm_scans=int(getattr(cfg, "min_confirm_scans", 1) or 1),
+            min_observed_move_pct=float(getattr(cfg, "min_observed_move_pct", 0.7)),
+            max_local_24h_pct=float(getattr(cfg, "max_local_24h_pct", 10.0)),
             min_global_24h_pct=float(getattr(cfg, "min_global_24h_pct", -5.0)),
             min_volume_change_24h_pct=float(getattr(cfg, "min_volume_change_24h_pct", -30.0)),
             btc_max_dump_pct=float(getattr(cfg, "btc_max_dump_pct", 1.0)),
@@ -1137,7 +1137,7 @@ class CryptoScannerApp:
         current_prices: Dict[str, float] = {}
         df["Signal"] = "Neutral"
 
-        movement_lookback = int(getattr(cfg, "movement_lookback_scans", 6) or 6) if cfg is not None else 6
+        movement_lookback = int(getattr(cfg, "movement_lookback_scans", 4) or 4) if cfg is not None else 4
         movement_lookback = max(1, min(movement_lookback, 60))
         market_condition = self._get_market_condition(g_data) if g_data else "Neutral"
 

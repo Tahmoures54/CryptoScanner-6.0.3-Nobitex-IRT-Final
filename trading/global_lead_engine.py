@@ -24,6 +24,8 @@ from core.utils import safe_float
 STABLES = {"USDT", "USDC", "USD", "DAI", "TUSD", "FDUSD", "USDE", "PYUSD"}
 _BTC_PROXIES = {"BTC", "WBTC", "TBTC"}
 _RECENT_SCANS = 2
+_FADE_PCT = 0.25
+_WIDE_SPREAD_EXTRA_PCT = 0.35
 
 
 def _pct_change(new: float, old: float) -> Optional[float]:
@@ -47,17 +49,17 @@ class GlobalLeadEngine:
     def __init__(
         self,
         *,
-        global_pump_pct: float = 2.0,
-        max_spread_pct: float = 1.0,
+        global_pump_pct: float = 1.2,
+        max_spread_pct: float = 1.2,
         min_global_volume_usd: float = 1_000_000.0,
         max_global_quote_age_sec: float = 300.0,
         min_local_volume_irt: float = 2_000_000.0,
         max_local_fall_pct: float = 0.8,
-        max_chase_pct: float = 0.7,
-        movement_lookback_scans: int = 8,
-        min_confirm_scans: int = 2,
-        min_observed_move_pct: float = 1.2,
-        max_local_24h_pct: float = 15.0,
+        max_chase_pct: float = 0.55,
+        movement_lookback_scans: int = 4,
+        min_confirm_scans: int = 1,
+        min_observed_move_pct: float = 0.7,
+        max_local_24h_pct: float = 10.0,
         min_global_24h_pct: float = -5.0,
         min_volume_change_24h_pct: float = -30.0,
         btc_max_dump_pct: float = 1.0,
@@ -189,9 +191,15 @@ class GlobalLeadEngine:
     ) -> Optional[float]:
         if current <= 0 or not history:
             return None
-        if len(history) < lookback:
-            return None
-        baseline = float(history[-lookback][1])
+        want = max(1, int(lookback or 1))
+        have = len(history)
+        if have >= want:
+            baseline = float(history[-want][1])
+        else:
+            min_partial = 3 if want >= 3 else want
+            if have < min_partial:
+                return None
+            baseline = float(history[0][1])
         return _pct_change(current, baseline)
 
     def _record(self, symbol: str, usd: float, irt: float, now: float) -> None:
@@ -324,7 +332,7 @@ class GlobalLeadEngine:
                 stats["volume"] += 1
                 continue
             spread = (ask - bid) / bid * 100.0 if ask >= bid else 99.0
-            if spread > self.max_spread_pct:
+            if spread > self.max_spread_pct + _WIDE_SPREAD_EXTRA_PCT:
                 stats["spread"] += 1
                 continue
             if g["GlobalVolumeUSD"] < self.min_global_volume_usd:
@@ -357,18 +365,29 @@ class GlobalLeadEngine:
                 self._reset_hit(symbol)
                 continue
 
-            if observed_global is not None and observed_global < -0.15:
+            live_move = observed_global if observed_global is not None else g["Global1hPct"]
+            if spread > self.max_spread_pct:
+                local_ok = observed_local is not None and observed_local >= 0.35
+                if not (local_ok and live_move >= max(obs_need + 0.5, 1.4)):
+                    stats["spread"] += 1
+                    continue
+
+            if observed_global is not None and observed_global < -_FADE_PCT:
                 stats["falling"] += 1
                 self._reset_hit(symbol)
                 continue
 
-            if recent_global is not None and recent_global < -0.15:
+            if recent_global is not None and recent_global < -_FADE_PCT:
                 stats["fading"] += 1
                 self._reset_hit(symbol)
                 continue
 
             local_tick = safe_float(local.get("Nobitex 30s Change (%)")) or 0.0
             if local_tick < -self.max_local_fall_pct:
+                stats["local_fall"] += 1
+                self._reset_hit(symbol)
+                continue
+            if observed_local is not None and observed_local < -0.40:
                 stats["local_fall"] += 1
                 self._reset_hit(symbol)
                 continue
@@ -384,9 +403,13 @@ class GlobalLeadEngine:
             if first is None:
                 self._trend_first_seen[symbol] = now
                 first = now
-            live_move = observed_global if observed_global is not None else g["Global1hPct"]
             self._last_move[symbol] = live_move
-            if hits < self.min_confirm_scans:
+            strong_now = (
+                (observed_global is not None and observed_global >= max(obs_need, 1.2))
+                or g["Global1hPct"] >= max(self.global_pump_pct, 1.5)
+            )
+            need_hits = 1 if strong_now else self.min_confirm_scans
+            if hits < need_hits:
                 stats["confirm"] += 1
                 continue
 

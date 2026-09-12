@@ -35,28 +35,34 @@ A coin qualifies when **either**:
 
 - the stored path is not falling
 - the last ~2 scans are not rolling over (fade)
-- the same condition holds for `min_confirm_scans` consecutive cycles (default 2)
+- the same condition holds for `min_confirm_scans` consecutive cycles, **unless**
+  the move is already strong (observed >= 1.2% or CMC 1h >= 1.5%) — those skip
+  extra confirm so a fast pump is not watched from the sidelines
 - Nobitex is not dumping on the latest tick
 
 A green CMC 1h print is rejected when the stored CMC path, or the last two
 scans, are already falling.
 
+Observed move can be measured from partial history: if lookback is 4+ scans but
+only 3 prints are stored yet, the engine uses the oldest stored print instead of
+waiting for a full window.
+
 ## Quality filters (not a lag trade)
 
 Default production gates:
 
-- CMC 1h move >= 2.0% **or** observed CMC move >= 1.2%
-- Trend must hold for 2 scans
-- Lookback 8 scans (~2 min at a 15s interval)
-- Stored CMC path not falling / not fading
-- Nobitex spread <= 1.0%
+- CMC 1h move >= 1.2% **or** observed CMC move >= 0.7%
+- Trend confirm 1 scan; strong 1h / observed moves enter on the first qualifying scan
+- Lookback 4 scans (~1 min at a 15s interval); partial history after 3 prints is enough
+- Stored CMC path not falling / not fading (fade threshold −0.25%)
+- Nobitex spread <= 1.2%; up to +0.35% extra only if local is participating and the live move is strong
 - Global 24h volume >= $1,000,000
 - Global quote age <= 300 seconds
 - Nobitex local volume >= 2,000,000 IRT (Rial)
-- Local 24h already-pumped cap 15%
+- Local 24h already-pumped cap 10%
 - Skip alts when BTC dumps more than 1.0%
-- Maximum chase (ask vs last) <= 0.7%
-- Stop 2.2%; trail activates at 1.5% profit with 4% distance; no take-profit cap
+- Maximum chase (ask vs last) <= 0.55%
+- Stop 1.8%; trail activates at 0.8% profit with 1.6% distance; no take-profit cap
 - Fixed size: 10,000,000 IRT (Rial) per trade
 
 These are risk/quality filters, not profit guarantees.

@@ -55,12 +55,12 @@ class PaperTradingPanel(tk.Frame):
     DEFAULT_PAPER_SETTINGS = {
         "size": "10000000",
         "tp": "0",
-        "sl": "2.2",
+        "sl": "1.8",
         "max_open": "3",
         "capital": "38000000",
         "trailing_enabled": True,
-        "trailing_distance": "4.0",
-        "trailing_activation": "1.5",
+        "trailing_distance": "1.6",
+        "trailing_activation": "0.8",
     }
 
     def __init__(self, parent: tk.Widget, main_app: Any) -> None:
@@ -124,12 +124,12 @@ class PaperTradingPanel(tk.Frame):
                 self.tracker.pump_threshold_pct = 0.0
                 self.tracker.ignore_signal_filters = True
                 self.tracker.confirmation_enabled = False
-                self.tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 2.2) or 2.2)
+                self.tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 1.8) or 1.8)
                 self.tracker.trailing_distance_pct = float(
-                    getattr(cfg, "trailing_distance_pct", 4.0) or 4.0
+                    getattr(cfg, "trailing_distance_pct", 1.6) or 1.6
                 )
                 self.tracker.trailing_activation_pct = float(
-                    getattr(cfg, "trailing_activation_pct", 1.5) or 1.5
+                    getattr(cfg, "trailing_activation_pct", 0.8) or 0.8
                 )
                 self.tracker.trailing_stop_enabled = True
                 self.tracker.take_profit_percent = float(
@@ -145,16 +145,16 @@ class PaperTradingPanel(tk.Frame):
                 return
             size = float(settings.get("size", 10000000))
             tp = float(settings.get("tp", 0.0))
-            sl = float(settings.get("sl", 2.2))
+            sl = float(settings.get("sl", 1.8))
             max_open = int(settings.get("max_open", 3))
             capital = float(settings.get("capital", 10_000_000))
-            trailing_distance = float(settings.get("trailing_distance", 4.0))
+            trailing_distance = float(settings.get("trailing_distance", 1.6))
             trailing_enabled = bool(settings.get("trailing_enabled", True))
 
             self.tracker.pump_threshold_pct = 0.0
             self.tracker.trailing_distance_pct = trailing_distance
             self.tracker.trailing_activation_pct = float(
-                settings.get("trailing_activation", 1.5)
+                settings.get("trailing_activation", 0.8)
             )
             self.tracker.trailing_stop_enabled = trailing_enabled
             self.tracker.ignore_signal_filters = True

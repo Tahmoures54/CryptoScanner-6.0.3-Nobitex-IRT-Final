@@ -28,7 +28,7 @@ DEFAULT_MAX_NOTIONAL_QUOTE = 10_000_000.0
 DEFAULT_MIN_NOTIONAL_QUOTE = 300_000.0
 DEFAULT_MAX_POSITION_PCT = 30.0
 DEFAULT_MAX_TOTAL_EXPOSURE_PCT = 80.0
-STRATEGY_DEFAULTS_VERSION = 3
+STRATEGY_DEFAULTS_VERSION = 4
 # Runtime configuration lives in the per-user AppData directory. The project
 # copy under data/ is a release template only and is never the live config.
 DEFAULT_CONFIG_FILE = os.path.join(APPDATA_DIR, "bot_config.json")
@@ -113,10 +113,10 @@ class BotConfig:
 
     # ── Pure Price Action / Real Movement Strategy ──────────
     pump_threshold_pct: float = 3.0
-    movement_lookback_scans: int = 8
-    stop_loss_pct: float = 2.2
-    trailing_distance_pct: float = 4.0
-    trailing_activation_pct: float = 1.5
+    movement_lookback_scans: int = 4
+    stop_loss_pct: float = 1.8
+    trailing_distance_pct: float = 1.6
+    trailing_activation_pct: float = 0.8
     trailing_stop_enabled: bool = True
     take_profit_percent: float = 0.0
 
@@ -135,7 +135,7 @@ class BotConfig:
     # ── Cooldowns ────────────────────────────────────────────
     cooldown_after_loss_min: int = 15
     cooldown_after_win_min: int = 5
-    entry_cooldown_seconds: int = 300
+    entry_cooldown_seconds: int = 480
 
     # ── Automation / Notifications ───────────────────────────
     check_interval_seconds: int = 15
@@ -148,7 +148,7 @@ class BotConfig:
     confirmation_pct: float = 0.35
     confirmation_max_minutes: int = 8
     invalidation_pct: float = 1.0
-    max_chase_pct: float = 0.7
+    max_chase_pct: float = 0.55
     min_quality: float = 0.4
     blocked_risk_levels: List[str] = field(default_factory=lambda: ["High", "Extreme"])
     reverse_signal_exit_enabled: bool = True
@@ -157,17 +157,17 @@ class BotConfig:
     # ── Real-movement trend follow (CMC intelligence → Nobitex) ──
     strategy: str = "global_lead_local_lag"
     global_signal_source: str = "CoinMarketCap"
-    global_pump_threshold_pct: float = 2.0
+    global_pump_threshold_pct: float = 1.2
     min_nobitex_discount_pct: float = 0.0
     max_nobitex_discount_pct: float = 18.0
-    max_nobitex_spread_pct: float = 1.0
+    max_nobitex_spread_pct: float = 1.2
     min_global_volume_usd: float = 1_000_000.0
     max_global_quote_age_sec: float = 300.0
     max_local_fall_pct: float = 0.8
     global_scan_limit: int = 500
-    min_confirm_scans: int = 2
-    min_observed_move_pct: float = 1.2
-    max_local_24h_pct: float = 15.0
+    min_confirm_scans: int = 1
+    min_observed_move_pct: float = 0.7
+    max_local_24h_pct: float = 10.0
     min_global_24h_pct: float = -5.0
     min_volume_change_24h_pct: float = -30.0
     btc_max_dump_pct: float = 1.0
@@ -340,13 +340,33 @@ TREND_EV_DEFAULTS: Dict[str, Any] = {
 # One-time overlay so a live install still on 100 / 750_000 Rial lots
 # is raised to 10,000,000 Rial (1,000,000 Tomans) per trade.
 POSITION_SIZE_DEFAULTS: Dict[str, Any] = {
-    "strategy_defaults_version": STRATEGY_DEFAULTS_VERSION,
+    "strategy_defaults_version": 3,
     "position_size_mode": "fixed",
     "fixed_position_quote": DEFAULT_FIXED_POSITION_QUOTE,
     "max_notional_quote": DEFAULT_MAX_NOTIONAL_QUOTE,
     "min_notional_quote": DEFAULT_MIN_NOTIONAL_QUOTE,
     "max_position_pct": DEFAULT_MAX_POSITION_PCT,
     "max_total_exposure_pct": DEFAULT_MAX_TOTAL_EXPOSURE_PCT,
+}
+
+# Enter forming moves sooner and lock small winners. Late 2-scan / 8-lookback
+# entries plus a 4% trail sat out pumps and gave back early gains.
+EARLY_TREND_DEFAULTS: Dict[str, Any] = {
+    "strategy_defaults_version": STRATEGY_DEFAULTS_VERSION,
+    "global_pump_threshold_pct": 1.2,
+    "min_observed_move_pct": 0.7,
+    "max_nobitex_spread_pct": 1.2,
+    "movement_lookback_scans": 4,
+    "min_confirm_scans": 1,
+    "stop_loss_pct": 1.8,
+    "trailing_distance_pct": 1.6,
+    "trailing_activation_pct": 0.8,
+    "take_profit_percent": 0.0,
+    "max_chase_pct": 0.55,
+    "max_local_24h_pct": 10.0,
+    "confirmation_enabled": False,
+    "entry_cooldown_seconds": 480,
+    "check_interval_seconds": 15,
 }
 
 
@@ -377,8 +397,10 @@ def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
             version = int(data.get("strategy_defaults_version") or 0)
             if version < 2:
                 data.update(TREND_EV_DEFAULTS)
-            if version < STRATEGY_DEFAULTS_VERSION:
+            if version < 3:
                 data.update(POSITION_SIZE_DEFAULTS)
+            if version < 4:
+                data.update(EARLY_TREND_DEFAULTS)
 
             cfg = BotConfig.from_dict(data)
             # Nobitex spot trading is configured in Rial by default.  Keep the

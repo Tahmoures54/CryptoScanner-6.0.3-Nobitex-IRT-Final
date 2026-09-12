@@ -142,10 +142,10 @@ class RealTradingPanel(tk.Frame):
                 0.0 if self._using_app_live_tracker
                 else float(getattr(self.config, "pump_threshold_pct", 5.0))
             )
-            self.tracker.stop_loss_pct = float(getattr(self.config, "stop_loss_pct", 2.2))
-            self.tracker.trailing_distance_pct = float(getattr(self.config, "trailing_distance_pct", 4.0))
+            self.tracker.stop_loss_pct = float(getattr(self.config, "stop_loss_pct", 1.8))
+            self.tracker.trailing_distance_pct = float(getattr(self.config, "trailing_distance_pct", 1.6))
             self.tracker.trailing_activation_pct = float(
-                getattr(self.config, "trailing_activation_pct", 1.5)
+                getattr(self.config, "trailing_activation_pct", 0.8)
             )
             self.tracker.take_profit_percent = float(getattr(self.config, "take_profit_percent", 0.0))
             self.tracker.risk_per_trade_pct = float(getattr(self.config, "risk_per_trade_pct", 1.0))
@@ -1287,9 +1287,9 @@ class BotSettingsWindow(BaseDialog):
     _RISK_FIELDS: List[Tuple[str, str, float]] = [
         ("Risk per trade %", "risk_per_trade_pct", 1.0),
         ("Max positions", "max_open_positions", 5),
-        ("Stop Loss %", "stop_loss_pct", 2.2),
-        ("Trailing Distance %", "trailing_distance_pct", 4.0),
-        ("Trail activation %", "trailing_activation_pct", 1.5),
+        ("Stop Loss %", "stop_loss_pct", 1.8),
+        ("Trailing Distance %", "trailing_distance_pct", 1.6),
+        ("Trail activation %", "trailing_activation_pct", 0.8),
         ("Max daily loss %", "max_drawdown_percent", 10.0),
     ]
 
@@ -1302,9 +1302,9 @@ class BotSettingsWindow(BaseDialog):
         "quote_currency": "IRT",
         "risk_per_trade_pct": 1.0,
         "max_open_positions": 3,
-        "stop_loss_pct": 2.2,
-        "trailing_distance_pct": 4.0,
-        "trailing_activation_pct": 1.5,
+        "stop_loss_pct": 1.8,
+        "trailing_distance_pct": 1.6,
+        "trailing_activation_pct": 0.8,
         "max_drawdown_percent": 10.0,
         "pump_threshold_pct": 5.0,
         "take_profit_percent": 0.0,
@@ -1386,7 +1386,7 @@ class BotSettingsWindow(BaseDialog):
 
         tk.Label(
             sf,
-            text="Fewer, cleaner trends: tight spread, let winners run (trail 4%, no take-profit cap).",
+            text="Enter forming moves early. Strong 1h pumps skip extra confirm. Tight trail locks small winners.",
             font=T.font(size=T.FONT_XS),
             bg=T.BG_APP, fg=T.TEXT_MUTED,
         ).grid(row=0, column=0, columnspan=2, sticky="w", pady=(0, T.PAD_SM))
@@ -1394,17 +1394,17 @@ class BotSettingsWindow(BaseDialog):
         self._strategy_vars: Dict[str, tk.Variable] = {}
         row = 1
         float_fields = [
-            ("global_pump_threshold_pct", "CMC 1h move threshold (%)", 2.0),
-            ("min_observed_move_pct", "Min observed CMC move (%)", 1.2),
-            ("max_nobitex_spread_pct", "Max Nobitex spread (%)", 1.0),
+            ("global_pump_threshold_pct", "CMC 1h move threshold (%)", 1.2),
+            ("min_observed_move_pct", "Min observed CMC move (%)", 0.7),
+            ("max_nobitex_spread_pct", "Max Nobitex spread (%)", 1.2),
             ("min_global_volume_usd", "Min CMC 24h volume (USD)", 1000000.0),
             ("max_global_quote_age_sec", "Max CMC quote age (sec)", 300.0),
             ("btc_max_dump_pct", "Skip alts if BTC dumps more than (%)", 1.0),
         ]
         int_fields = [
             ("check_interval_seconds", "Live scan interval (sec)", 15),
-            ("movement_lookback_scans", "Lookback scans for observed move", 8),
-            ("min_confirm_scans", "Trend confirm scans (hold the move)", 2),
+            ("movement_lookback_scans", "Lookback scans for observed move", 4),
+            ("min_confirm_scans", "Trend confirm scans (hold the move)", 1),
             ("max_new_entries_per_cycle", "Max new entries per scan", 1),
         ]
         for key, label, default in float_fields:
@@ -1671,7 +1671,7 @@ class BotSettingsWindow(BaseDialog):
         self._risk_vars["trailing_distance_pct"].set(self.DEFAULT_SETTINGS["trailing_distance_pct"])
         if "trailing_activation_pct" in self._risk_vars:
             self._risk_vars["trailing_activation_pct"].set(
-                self.DEFAULT_SETTINGS.get("trailing_activation_pct", 1.5)
+                self.DEFAULT_SETTINGS.get("trailing_activation_pct", 0.8)
             )
         self._risk_vars["max_drawdown_percent"].set(self.DEFAULT_SETTINGS["max_drawdown_percent"])
         self._pump_var.set(self.DEFAULT_SETTINGS["pump_threshold_pct"])
@@ -1687,15 +1687,15 @@ class BotSettingsWindow(BaseDialog):
             self._nobitex_market_var.set("IRT")
         if hasattr(self, "_strategy_vars"):
             defaults = {
-                "global_pump_threshold_pct": 2.0,
-                "min_observed_move_pct": 1.2,
-                "max_nobitex_spread_pct": 1.0,
+                "global_pump_threshold_pct": 1.2,
+                "min_observed_move_pct": 0.7,
+                "max_nobitex_spread_pct": 1.2,
                 "min_global_volume_usd": 1000000.0,
                 "max_global_quote_age_sec": 300.0,
                 "btc_max_dump_pct": 1.0,
                 "check_interval_seconds": 15,
-                "movement_lookback_scans": 8,
-                "min_confirm_scans": 2,
+                "movement_lookback_scans": 4,
+                "min_confirm_scans": 1,
                 "max_new_entries_per_cycle": 1,
             }
             for key, value in defaults.items():
@@ -1824,13 +1824,13 @@ class BotSettingsWindow(BaseDialog):
                 getattr(self.config, "confirmation_pct", 0.35)
             )
             app.real_signal_tracker.stop_loss_pct = float(
-                getattr(self.config, "stop_loss_pct", 2.2)
+                getattr(self.config, "stop_loss_pct", 1.8)
             )
             app.real_signal_tracker.trailing_distance_pct = float(
-                getattr(self.config, "trailing_distance_pct", 4.0)
+                getattr(self.config, "trailing_distance_pct", 1.6)
             )
             app.real_signal_tracker.trailing_activation_pct = float(
-                getattr(self.config, "trailing_activation_pct", 1.5)
+                getattr(self.config, "trailing_activation_pct", 0.8)
             )
             app.real_signal_tracker.take_profit_percent = float(
                 getattr(self.config, "take_profit_percent", 0.0) or 0.0

@@ -1,10 +1,10 @@
 {
   "size": "10000000",
   "tp": "0",
-  "sl": "2.2",
+  "sl": "1.8",
   "max_open": "3",
   "capital": "38000000",
   "trailing_enabled": true,
-  "trailing_distance": "4.0",
-  "trailing_activation": "1.5"
+  "trailing_distance": "1.6",
+  "trailing_activation": "0.8"
 }

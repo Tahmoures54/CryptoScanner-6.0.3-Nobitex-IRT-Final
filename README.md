@@ -34,17 +34,17 @@ At each scan CryptoScanner stores the actual CMC USD price observed for an asset
 
 Recommended initial settings for a live or paper account:
 
-- CMC 1h move: 2.0% (or observed lookback move 1.2%)
-- Lookback: 8 scans
-- Trend confirm scans: 2
+- CMC 1h move: 1.2% (or observed lookback move 0.7%)
+- Lookback: 4 scans (partial history after 3 prints is enough)
+- Trend confirm scans: 1 (strong 1h / observed moves skip extra confirm)
 - Scan interval: 15 seconds
-- Max Nobitex spread: 1.0%
+- Max Nobitex spread: 1.2% (slightly wider only if local is participating)
 - Min CMC 24h volume: $1,000,000
 - Max open positions: 3
 - Fixed size: 10,000,000 IRT (Rial) = 1,000,000 Tomans per trade
-- Stop Loss: 2.2%
-- Trailing activation: 1.5%
-- Trailing distance: 4.0% (winners can run; no take-profit cap)
+- Stop Loss: 1.8%
+- Trailing activation: 0.8%
+- Trailing distance: 1.6% (lock small winners; no take-profit cap)
 - Extra entry-tick confirmation: **OFF**
 - Paper uses the same rules and the full Nobitex book for exits
 - Auto Trading: **OFF until connection diagnostics pass**

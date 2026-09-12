@@ -107,9 +107,9 @@ class SignalTracker:
         self.min_market_cap = float(min_market_cap)
 
         self.pump_threshold_pct = 5.0
-        self.trailing_distance_pct = 4.0
-        self.trailing_activation_pct = 1.5
-        self.stop_loss_pct = 2.2
+        self.trailing_distance_pct = 1.6
+        self.trailing_activation_pct = 0.8
+        self.stop_loss_pct = 1.8
         self.trailing_stop_enabled = True
         self.take_profit_percent = 0.0
         self.trading_fee_pct = 0.1
@@ -537,11 +537,11 @@ class SignalTracker:
         if self.pump_threshold_pct <= 0:
             self.pump_threshold_pct = 5.0
         if self.trailing_distance_pct <= 0:
-            self.trailing_distance_pct = 4.0
+            self.trailing_distance_pct = 1.6
         if getattr(self, "trailing_activation_pct", 0) < 0:
             self.trailing_activation_pct = 0.0
         if self.stop_loss_pct <= 0:
-            self.stop_loss_pct = 2.2
+            self.stop_loss_pct = 1.8
         if self.max_drawdown_percent <= 0 or self.max_drawdown_percent > 50:
             self.max_drawdown_percent = 15.0
         if self.max_total_exposure_pct <= 0 or self.max_total_exposure_pct > 100:
