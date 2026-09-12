@@ -21,6 +21,14 @@ from core.config import APPDATA_DIR
 logger = logging.getLogger(__name__)
 
 _SOURCE_DIR = Path(__file__).resolve().parent.parent
+
+# Nobitex IRT amounts are Rial. 10,000,000 Rial = 1,000,000 Tomans per trade.
+DEFAULT_FIXED_POSITION_QUOTE = 10_000_000.0
+DEFAULT_MAX_NOTIONAL_QUOTE = 10_000_000.0
+DEFAULT_MIN_NOTIONAL_QUOTE = 300_000.0
+DEFAULT_MAX_POSITION_PCT = 30.0
+DEFAULT_MAX_TOTAL_EXPOSURE_PCT = 80.0
+STRATEGY_DEFAULTS_VERSION = 3
 # Runtime configuration lives in the per-user AppData directory. The project
 # copy under data/ is a release template only and is never the live config.
 DEFAULT_CONFIG_FILE = os.path.join(APPDATA_DIR, "bot_config.json")
@@ -113,12 +121,12 @@ class BotConfig:
     take_profit_percent: float = 0.0
 
     # ── Position Sizing ──────────────────────────────────────
-    position_size_mode: str = "risk_percent"
-    fixed_position_quote: float = 100.0
-    max_position_pct: float = 20.0
-    min_notional_quote: float = 10.0
-    max_notional_quote: float = 1_000_000.0
-    max_total_exposure_pct: float = 50.0
+    position_size_mode: str = "fixed"
+    fixed_position_quote: float = DEFAULT_FIXED_POSITION_QUOTE
+    max_position_pct: float = DEFAULT_MAX_POSITION_PCT
+    min_notional_quote: float = DEFAULT_MIN_NOTIONAL_QUOTE
+    max_notional_quote: float = DEFAULT_MAX_NOTIONAL_QUOTE
+    max_total_exposure_pct: float = DEFAULT_MAX_TOTAL_EXPOSURE_PCT
 
     # ── Filters ─────────────────────────────────────────────
     min_volume_24h: float = 2_000_000.0
@@ -166,7 +174,7 @@ class BotConfig:
     cmc_listings_ttl_sec: float = 45.0
     min_ask_depth_quote: float = 0.0
     max_local_premium_pct: float = 0.0
-    strategy_defaults_version: int = 2
+    strategy_defaults_version: int = STRATEGY_DEFAULTS_VERSION
 
     # ── File Paths ───────────────────────────────────────────
     trade_log_file: str = field(default_factory=lambda: os.path.join(APPDATA_DIR, "trade_history.json"))
@@ -306,7 +314,7 @@ BotConfig.__init__ = _botconfig_init  # type: ignore[method-assign]
 
 
 # One-time overlay for installs still on the lag-era / tight-trail factory numbers.
-# Does not touch credentials, balance, or fixed position size.
+# Strategy fields only; lot size is migrated separately in POSITION_SIZE_DEFAULTS.
 TREND_EV_DEFAULTS: Dict[str, Any] = {
     "strategy_defaults_version": 2,
     "global_pump_threshold_pct": 2.0,
@@ -327,6 +335,18 @@ TREND_EV_DEFAULTS: Dict[str, Any] = {
     "max_open_positions": 3,
     "max_new_entries_per_cycle": 1,
     "cooldown_after_win_min": 5,
+}
+
+# One-time overlay so a live install still on 100 / 750_000 Rial lots
+# is raised to 10,000,000 Rial (1,000,000 Tomans) per trade.
+POSITION_SIZE_DEFAULTS: Dict[str, Any] = {
+    "strategy_defaults_version": STRATEGY_DEFAULTS_VERSION,
+    "position_size_mode": "fixed",
+    "fixed_position_quote": DEFAULT_FIXED_POSITION_QUOTE,
+    "max_notional_quote": DEFAULT_MAX_NOTIONAL_QUOTE,
+    "min_notional_quote": DEFAULT_MIN_NOTIONAL_QUOTE,
+    "max_position_pct": DEFAULT_MAX_POSITION_PCT,
+    "max_total_exposure_pct": DEFAULT_MAX_TOTAL_EXPOSURE_PCT,
 }
 
 
@@ -354,8 +374,11 @@ def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
             data.pop("api_key_encrypted", None)
             data.pop("api_secret_encrypted", None)
 
-            if int(data.get("strategy_defaults_version") or 0) < 2:
+            version = int(data.get("strategy_defaults_version") or 0)
+            if version < 2:
                 data.update(TREND_EV_DEFAULTS)
+            if version < STRATEGY_DEFAULTS_VERSION:
+                data.update(POSITION_SIZE_DEFAULTS)
 
             cfg = BotConfig.from_dict(data)
             # Nobitex spot trading is configured in Rial by default.  Keep the

@@ -1,9 +1,9 @@
 {
-  "size": "750000",
+  "size": "10000000",
   "tp": "0",
   "sl": "2.2",
   "max_open": "3",
-  "capital": "10000000",
+  "capital": "38000000",
   "trailing_enabled": true,
   "trailing_distance": "4.0",
   "trailing_activation": "1.5"

@@ -367,6 +367,30 @@ class TestPrioritization(unittest.TestCase):
         trades = self.tracker.get_all_trades()
         self.assertEqual(trades[0]["symbol"], "B")
 
+    def test_fixed_ten_million_rial_not_clipped_by_stale_caps(self):
+        t = self.tracker
+        t.position_size_mode = "fixed"
+        t.fixed_position_quote = 10_000_000.0
+        t.max_notional_quote = 1_000_000.0
+        t.max_position_pct = 25.0
+        t.min_notional_quote = 300_000.0
+        t.account_balance = 38_000_000.0
+        t.cash = 38_000_000.0
+        price = 12_680_530.0
+        qty = t._position_size_for(price, 2.2)
+        self.assertGreater(qty, 0)
+        self.assertAlmostEqual(qty * price, 10_000_000.0, delta=1.0)
+
+    def test_fixed_lot_needs_enough_cash(self):
+        t = self.tracker
+        t.position_size_mode = "fixed"
+        t.fixed_position_quote = 10_000_000.0
+        t.min_notional_quote = 300_000.0
+        t.account_balance = 1_000_000.0
+        t.cash = 1_000_000.0
+        qty = t._position_size_for(12_680_530.0, 2.2)
+        self.assertEqual(qty, 0.0)
+
 
 if __name__ == "__main__":
     unittest.main()

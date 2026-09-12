@@ -186,6 +186,8 @@ def test_filter_stats_explain_zero_candidates():
     assert e.last_stats["passed"] == 0
     assert "no_cmc=" in e.stats_line()
     assert "no_trend=" in e.stats_line()
+    assert "confirm=" in e.stats_line()
+    assert "chase=" in e.stats_line()
     assert "premium=" not in e.stats_line()
     assert "local_ahead=" not in e.stats_line()
 
@@ -239,10 +241,11 @@ def test_old_config_without_version_gets_asymmetric_defaults(tmp_path):
     assert loaded.trailing_distance_pct == 4.0
     assert loaded.stop_loss_pct == 2.2
     assert loaded.take_profit_percent == 0.0
-    assert loaded.strategy_defaults_version == 2
+    assert loaded.strategy_defaults_version == 3
+    assert loaded.fixed_position_quote == 10_000_000.0
 
 
-def test_saved_v2_config_is_not_overwritten(tmp_path):
+def test_saved_v2_config_keeps_strategy_but_raises_lot_size(tmp_path):
     cfg = BotConfig.from_dict({
         "strategy_defaults_version": 2,
         "global_pump_threshold_pct": 1.8,
@@ -255,4 +258,8 @@ def test_saved_v2_config_is_not_overwritten(tmp_path):
     assert loaded.global_pump_threshold_pct == 1.8
     assert loaded.max_nobitex_spread_pct == 0.8
     assert loaded.trailing_distance_pct == 5.0
+    assert loaded.strategy_defaults_version == 3
+    assert loaded.position_size_mode == "fixed"
+    assert loaded.fixed_position_quote == 10_000_000.0
+    assert loaded.max_notional_quote == 10_000_000.0
 

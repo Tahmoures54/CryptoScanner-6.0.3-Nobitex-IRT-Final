@@ -684,7 +684,7 @@ class TradingBot:
                 if base:
                     return f"{base}{market}"
 
-        return raw
+        return f"{raw}{market}"
 
     def place_order(
         self,

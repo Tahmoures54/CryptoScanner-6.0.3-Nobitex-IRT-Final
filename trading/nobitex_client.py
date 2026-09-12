@@ -255,7 +255,8 @@ class NobitexClient(ExchangeBase):
         )
         if self.quote_currency:
             base, _ = self._split_symbol(cleaned)
-            return base + self.quote_currency
+            quote = "IRT" if self.quote_currency in ("IRT", "RLS", "IRR") else self.quote_currency
+            return f"{base}{quote}"
         return cleaned
 
     def is_symbol_supported(self, symbol: str) -> bool:
@@ -560,11 +561,15 @@ class NobitexClient(ExchangeBase):
         return []
 
     def _split_symbol(self, market_symbol: str) -> tuple:
-        known_quotes = ["USDT", "USDC", "IRT", "RLS", "BTC", "ETH"]
+        known_quotes = ("USDT", "USDC", "IRT", "RLS", "BTC", "ETH")
+        symbol = str(market_symbol or "").upper()
         for q in known_quotes:
-            if market_symbol.endswith(q) and len(market_symbol) > len(q):
-                return market_symbol[: -len(q)], q
-        return market_symbol[:-3], market_symbol[-3:]
+            if symbol.endswith(q) and len(symbol) > len(q):
+                return symbol[: -len(q)], q
+        # Bare bases such as PROM / DOGE / BTC must keep every letter.
+        # The old fallback stole the last three characters (PROM → P + ROM).
+        quote = "IRT" if self.quote_currency in ("IRT", "RLS", "IRR") else (self.quote_currency or "IRT")
+        return symbol, quote
 
     def _map_quote(self, quote: str) -> str:
         if quote.upper() in ("IRT", "RLS"):

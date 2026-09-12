@@ -109,3 +109,56 @@ def test_low_price_stop_price_keeps_precision(monkeypatch):
     monkeypatch.setattr(client._session, "request", fake_request)
     client.place_order("VTHOIRT", "sell", "stop_market", 1000, stop_price=0.00067225)
     assert captured["data"]["stopPrice"] == "0.00067225"
+
+
+def test_bare_base_symbols_resolve_to_irt_pairs():
+    client = _client()
+    assert client.resolve_symbol("PROM") == "PROMIRT"
+    assert client.resolve_symbol("DOGE") == "DOGEIRT"
+    assert client.resolve_symbol("BTC") == "BTCIRT"
+    assert client.resolve_symbol("promirt") == "PROMIRT"
+    assert client.resolve_symbol("BTC/USDT") == "BTCIRT"
+    assert client._split_symbol("PROM") == ("PROM", "IRT")
+    assert client._split_symbol("PROMIRT") == ("PROM", "IRT")
+    assert client._split_symbol("DOGE") != ("D", "OGE")
+
+
+def test_is_symbol_supported_queries_full_base(monkeypatch):
+    client = _client()
+    captured = {}
+
+    class Response:
+        status_code = 200
+        content = b"{}"
+        def raise_for_status(self):
+            pass
+        def json(self):
+            return {
+                "status": "ok",
+                "stats": {
+                    "prom-rls": {"isClosed": False, "latest": "1"},
+                },
+            }
+
+    def fake_get(url, headers=None, timeout=None):
+        captured["url"] = url
+        return Response()
+
+    monkeypatch.setattr(client._session, "get", fake_get)
+    assert client.is_symbol_supported("PROM") is True
+    assert "srcCurrency=prom" in captured["url"]
+    assert "p-rls" not in captured["url"]
+
+
+def test_trader_appends_irt_to_bare_base():
+    from trading.trader import TradingBot
+
+    class Dummy:
+        exchange_name = "nobitex"
+        nobitex_market = "IRT"
+        quote_currency = "IRT"
+
+    bot = Dummy()
+    assert TradingBot.normalize_symbol_for_execution(bot, "PROM") == "PROMIRT"
+    assert TradingBot.normalize_symbol_for_execution(bot, "DOGE") == "DOGEIRT"
+    assert TradingBot.normalize_symbol_for_execution(bot, "BTCIRT") == "BTCIRT"

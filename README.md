@@ -41,6 +41,7 @@ Recommended initial settings for a live or paper account:
 - Max Nobitex spread: 1.0%
 - Min CMC 24h volume: $1,000,000
 - Max open positions: 3
+- Fixed size: 10,000,000 IRT (Rial) = 1,000,000 Tomans per trade
 - Stop Loss: 2.2%
 - Trailing activation: 1.5%
 - Trailing distance: 4.0% (winners can run; no take-profit cap)

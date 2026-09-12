@@ -151,15 +151,18 @@ class RealTradingPanel(tk.Frame):
             self.tracker.risk_per_trade_pct = float(getattr(self.config, "risk_per_trade_pct", 1.0))
             self.tracker.max_open_trades = int(getattr(self.config, "max_open_positions", 5))
             self.tracker.max_drawdown_percent = float(getattr(self.config, "max_drawdown_percent", 20.0))
-            self.tracker.fixed_position_quote = float(getattr(self.config, "fixed_position_quote", 100.0))
+            self.tracker.fixed_position_quote = float(getattr(self.config, "fixed_position_quote", 10_000_000.0))
             self.tracker.position_size_mode = str(
                 getattr(self.config, "position_size_mode", "fixed") or "fixed"
             ).lower()
-            self.tracker.min_notional_quote = float(getattr(self.config, "min_notional_quote", 3000000.0))
-            live_cash = max(float(self.tracker.account_balance or 0.0), 0.0)
+            self.tracker.min_notional_quote = float(getattr(self.config, "min_notional_quote", 300000.0))
             self.tracker.max_notional_quote = max(
-                float(getattr(self.config, "fixed_position_quote", 100.0)),
-                float(getattr(self.config, "max_position_pct", 20.0)) / 100.0 * live_cash,
+                float(getattr(self.config, "max_notional_quote", 10_000_000.0) or 0.0),
+                float(getattr(self.config, "fixed_position_quote", 10_000_000.0)),
+            )
+            self.tracker.max_position_pct = float(getattr(self.config, "max_position_pct", 30.0) or 30.0)
+            self.tracker.max_total_exposure_pct = float(
+                getattr(self.config, "max_total_exposure_pct", 80.0) or 80.0
             )
             if self._is_live_exchange() and self.tracker.position_size_mode == "fixed":
                 self.tracker.fixed_position_quote = max(
@@ -1305,8 +1308,8 @@ class BotSettingsWindow(BaseDialog):
         "max_drawdown_percent": 10.0,
         "pump_threshold_pct": 5.0,
         "take_profit_percent": 0.0,
-        "fixed_position_quote": 750000.0,
-        "max_position_pct": 10.0,
+        "fixed_position_quote": 10000000.0,
+        "max_position_pct": 30.0,
         "min_volume_24h": 500000.0,
         "cooldown_after_loss_min": 30,
         "cooldown_after_win_min": 30,
@@ -1573,7 +1576,7 @@ class BotSettingsWindow(BaseDialog):
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=1, column=0, sticky="w", pady=T.PAD_XS)
         self._fixed_position_var = tk.StringVar(
-            value=self._money_to_display(float(getattr(self.config, "fixed_position_quote", 750000.0)))
+            value=self._money_to_display(float(getattr(self.config, "fixed_position_quote", 10000000.0)))
         )
         ttk.Entry(ef, textvariable=self._fixed_position_var, width=18).grid(
             row=1, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
@@ -1595,7 +1598,7 @@ class BotSettingsWindow(BaseDialog):
             bg=T.BG_APP, fg=T.TEXT_SECONDARY,
         ).grid(row=3, column=0, sticky="w", pady=T.PAD_XS)
         self._max_position_pct_var = tk.DoubleVar(
-            value=float(getattr(self.config, "max_position_pct", 20.0))
+            value=float(getattr(self.config, "max_position_pct", 30.0))
         )
         ttk.Entry(ef, textvariable=self._max_position_pct_var, width=15).grid(
             row=3, column=1, sticky="w", padx=T.PAD_SM, pady=T.PAD_XS
@@ -1746,10 +1749,10 @@ class BotSettingsWindow(BaseDialog):
         self.config.pump_threshold_pct = self._get_float_or(self._pump_var, 5.0)
         self.config.take_profit_percent = self._get_float_or(self._take_profit_var, 0.0)
         self.config.fixed_position_quote = self._money_from_display(
-            self._fixed_position_var.get(), 750000.0
+            self._fixed_position_var.get(), 10000000.0
         )
         self.config.min_notional_quote = self._money_from_display(
-            self._min_notional_var.get() if hasattr(self, "_min_notional_var") else "30000",
+            self._min_notional_var.get() if hasattr(self, "_min_notional_var") else "300000",
             300000.0,
         )
         if hasattr(self, "_position_size_mode_var"):
@@ -1760,7 +1763,11 @@ class BotSettingsWindow(BaseDialog):
             self.config.confirmation_enabled = bool(self._confirmation_enabled_var.get())
         if hasattr(self, "_confirmation_pct_var"):
             self.config.confirmation_pct = self._get_float_or(self._confirmation_pct_var, 0.35)
-        self.config.max_position_pct = self._get_float_or(self._max_position_pct_var, 20.0)
+        self.config.max_position_pct = self._get_float_or(self._max_position_pct_var, 30.0)
+        self.config.max_notional_quote = max(
+            float(getattr(self.config, "max_notional_quote", 10_000_000.0) or 0.0),
+            float(self.config.fixed_position_quote or 0.0),
+        )
         self.config.min_volume_24h = self._get_float_or(self._min_volume_var, 100000.0)
         self.config.cooldown_after_loss_min = self._get_int_or(self._cooldown_loss_var, 15)
         self.config.cooldown_after_win_min = self._get_int_or(self._cooldown_win_var, 15)
@@ -1784,6 +1791,12 @@ class BotSettingsWindow(BaseDialog):
                 setattr(self.config, key, self._get_int_or(var, int(getattr(self.config, key, 1))))
             else:
                 setattr(self.config, key, self._get_float_or(var, float(getattr(self.config, key, 0.0))))
+
+        from trading.bot_config import STRATEGY_DEFAULTS_VERSION
+        self.config.strategy_defaults_version = max(
+            int(getattr(self.config, "strategy_defaults_version", STRATEGY_DEFAULTS_VERSION) or 0),
+            STRATEGY_DEFAULTS_VERSION,
+        )
 
         self.panel._save_cfg()
         self.panel.pump_threshold_pct = self.config.pump_threshold_pct

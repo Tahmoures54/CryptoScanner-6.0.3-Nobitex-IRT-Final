@@ -57,6 +57,7 @@ Default production gates:
 - Skip alts when BTC dumps more than 1.0%
 - Maximum chase (ask vs last) <= 0.7%
 - Stop 2.2%; trail activates at 1.5% profit with 4% distance; no take-profit cap
+- Fixed size: 10,000,000 IRT (Rial) per trade
 
 These are risk/quality filters, not profit guarantees.
 

@@ -892,18 +892,24 @@ class SignalTracker:
 
         if self.position_size_mode == "fixed":
             notional_rls = max(0.0, float(self.fixed_position_quote)) * multiplier
+            affordable = cash_rls * 0.90
+            if notional_rls > affordable + 1e-9:
+                logger.info(
+                    "Skip sizing: fixed lot %.2f %s exceeds 90%% of cash %.2f",
+                    notional_rls, self.quote_currency, cash_rls,
+                )
+                return 0.0
         else:
             risk_amount_rls = equity_rls * (self.risk_per_trade_pct / 100.0)
             notional_rls = (risk_amount_rls / (sl_pct / 100.0)) if sl_pct > 0 else 0.0
+            notional_rls = min(notional_rls, cash_rls * 0.90)
+            position_cap_rls = equity_rls * max(1.0, self.max_position_pct) / 100.0
+            notional_rls = min(notional_rls, position_cap_rls)
+            max_notional_rls = max(0.0, float(self.max_notional_quote)) * multiplier
+            if max_notional_rls > 0:
+                notional_rls = min(notional_rls, max_notional_rls)
 
-        notional_rls = min(notional_rls, cash_rls * 0.90)
-        position_cap_rls = equity_rls * max(1.0, self.max_position_pct) / 100.0
-        notional_rls = min(notional_rls, position_cap_rls)
-
-        max_notional_rls = max(0.0, float(self.max_notional_quote)) * multiplier
         min_notional_rls = max(0.0, float(self.min_notional_quote)) * multiplier
-        if max_notional_rls > 0:
-            notional_rls = min(notional_rls, max_notional_rls)
         if min_notional_rls > 0 and notional_rls < min_notional_rls:
             logger.info(
                 "Skip sizing: available position %.2f %s is below configured minimum %.2f %s",
@@ -1757,7 +1763,10 @@ class SignalTracker:
         if self.mode == "real" and self.executor:
             try:
                 if not self.executor.is_symbol_supported(symbol):
-                    self._log_skip("%s skipped: symbol not supported on exchange", symbol)
+                    logger.warning(
+                        "%s skipped: symbol not supported on exchange",
+                        symbol,
+                    )
                     return
             except Exception as e:
                 logger.warning("Symbol support check failed for %s: %s", symbol, e)
