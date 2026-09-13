@@ -276,3 +276,71 @@ def test_bot_settings_describe_nobitex_key_fields():
     assert "READ,TRADE" in src
     assert "WITHDRAW" in src
     assert "تومان" not in src
+    assert "execution_mode" in src
+    assert "Switch to Live" in src
+
+
+def test_parse_order_active_unmatched_is_open_not_filled():
+    client = _client()
+    parsed = client._parse_order({
+        "status": "Active",
+        "matchedAmount": "0",
+        "unmatchedAmount": "15.34",
+        "amount": "15.34",
+        "id": 6212089660,
+        "execution": "Market",
+        "type": "buy",
+        "market": "XTZ-RLS",
+        "averagePrice": "0",
+    })
+    assert parsed["status"] == "open"
+    assert parsed["matched_amount"] == 0.0
+    assert parsed["order_id"] == 6212089660
+
+
+def test_parse_order_done_with_zero_matched_is_not_filled():
+    client = _client()
+    parsed = client._parse_order({
+        "status": "Done",
+        "matchedAmount": "0",
+        "unmatchedAmount": "15.34",
+        "amount": "15.34",
+        "id": 99,
+        "execution": "Market",
+        "type": "buy",
+        "market": "XTZ-RLS",
+    })
+    assert parsed["status"] != "filled"
+    assert parsed["matched_amount"] == 0.0
+
+
+def test_wallet_total_includes_blocked_irt():
+    from trading.nobitex_client import _wallet_spendable, _wallet_total
+
+    wallet = {
+        "balance": "38183865.13",
+        "blockedBalance": "11108614.4",
+        "activeBalance": "27075250.73",
+    }
+    assert abs(_wallet_total(wallet) - 38183865.13) < 0.01
+    assert abs(_wallet_spendable(wallet) - 27075250.73) < 0.01
+
+
+def test_get_balance_total_keeps_locked_irt(monkeypatch):
+    client = _client()
+    wallets = {
+        "status": "ok",
+        "wallets": [
+            {
+                "currency": "rls",
+                "balance": "38183865.13",
+                "blockedBalance": "11108614.4",
+                "activeBalance": "27075250.73",
+            }
+        ],
+    }
+
+    monkeypatch.setattr(client, "_request", lambda *a, **k: wallets)
+    client.invalidate_balance_cache()
+    assert abs(client.get_balance("IRT") - 27075250.73) < 0.01
+    assert abs(client.get_balance_total("IRT") - 38183865.13) < 0.01

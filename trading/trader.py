@@ -586,6 +586,27 @@ class TradingBot:
             self._handle_balance_exception(exc, asset)
             return None
 
+    def get_balance_total(self, asset: str, force_refresh: bool = False) -> Optional[float]:
+        """Wallet total including funds reserved by unmatched open orders."""
+        if self.exchange is None:
+            return None
+        key = str(asset or "").strip().upper()
+        if not key:
+            return None
+        total_fn = getattr(self.exchange, "get_balance_total", None)
+        if not callable(total_fn):
+            return self.get_balance(key)
+        try:
+            parsed = _safe_float(total_fn(key, force_refresh=force_refresh), None)
+        except TypeError:
+            parsed = _safe_float(total_fn(key), None)
+        except Exception as exc:
+            logger.debug("get_balance_total failed for %s: %s", key, exc)
+            return self.get_balance(key)
+        if parsed is None or parsed < 0:
+            return self.get_balance(key)
+        return parsed
+
     def get_balance_fresh(self, asset: str) -> Optional[float]:
         """Force a cache-bypassing wallet read. Returns None when unknown."""
         if self.exchange is None:

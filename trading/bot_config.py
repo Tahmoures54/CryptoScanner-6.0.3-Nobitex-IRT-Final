@@ -17,6 +17,7 @@ from dataclasses import dataclass, field, asdict
 from cryptography.fernet import Fernet, InvalidToken
 
 from core.config import APPDATA_DIR
+from trading.execution_mode import PAPER, normalize_execution_mode
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ class BotConfig:
     # ── Automation / Notifications ───────────────────────────
     check_interval_seconds: int = 15
     enable_auto_trading: bool = True
+    execution_mode: str = PAPER
     trading_fee_pct: float = 0.1
     max_new_entries_per_cycle: int = 1
 
@@ -285,6 +287,8 @@ class BotConfig:
         if "blocked_risk_levels" in filtered and not isinstance(filtered["blocked_risk_levels"], list):
             raw = str(filtered["blocked_risk_levels"] or "")
             filtered["blocked_risk_levels"] = [x.strip() for x in raw.split(",") if x.strip()]
+        if "execution_mode" in filtered:
+            filtered["execution_mode"] = normalize_execution_mode(filtered["execution_mode"])
 
         return cls(**filtered)
 
@@ -403,6 +407,7 @@ def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
                 data.update(EARLY_TREND_DEFAULTS)
 
             cfg = BotConfig.from_dict(data)
+            cfg.execution_mode = normalize_execution_mode(getattr(cfg, "execution_mode", PAPER))
             # Nobitex spot trading is configured in Rial by default.  Keep the
             # explicit USDT option available, but migrate the old release
             # default (USDT + Nobitex) to IRT so an existing install does not

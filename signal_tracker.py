@@ -46,9 +46,10 @@ logger = logging.getLogger(__name__)
 _DATA_DIR = Path(CORE_APPDATA_DIR)
 APPDATA_DIR = str(_DATA_DIR)
 _DB_PATH = str(_DATA_DIR / "signal_log.db")
+_CONFIG_PATH = str(_DATA_DIR / "bot_config.json")
 _TS_FMT = "%Y-%m-%d %H:%M:%S"
 
-FILL_POLL_TIMEOUT = 8.0
+FILL_POLL_TIMEOUT = 15.0
 FILL_POLL_INTERVAL = 0.6
 
 # Treat a position as gone when the exchange holds less than this fraction
@@ -138,6 +139,7 @@ class SignalTracker:
         self.quote_currency = "USDT"
         self.ignore_signal_filters = False
         self.quiet_skips = True
+        self.allow_new_entries = True
 
         self._last_balance_read_ts = 0.0
         self._last_balance_value = 0.0
@@ -216,12 +218,41 @@ class SignalTracker:
         self._last_balance_read_ts = 0.0
         self.cash = self._read_executor_balance(force_refresh=True)
 
+    def _read_executor_quote_equity(self) -> float:
+        """Quote wallet including funds locked in unmatched open orders."""
+        if not self.executor:
+            return self.cash
+        try:
+            sources = [self.executor, getattr(self.executor, "exchange", None)]
+            for obj in sources:
+                if obj is None:
+                    continue
+                total_fn = getattr(obj, "get_balance_total", None)
+                if not callable(total_fn):
+                    continue
+                inv = getattr(obj, "invalidate_balance_cache", None)
+                if callable(inv):
+                    try:
+                        inv()
+                    except Exception:
+                        pass
+                try:
+                    value = float(total_fn(self.quote_currency))
+                except TypeError:
+                    continue
+                if value >= 0:
+                    return value
+        except Exception as exc:
+            logger.debug("Quote equity total unavailable: %s", exc)
+        return self._read_executor_balance(force_refresh=True)
+
     def _sync_balance_from_executor(self):
         if not self.executor:
             return
         try:
             self._refresh_cash_from_executor()
-            self.account_balance = self.cash + self._open_exposure_local()
+            quote_equity = self._read_executor_quote_equity()
+            self.account_balance = quote_equity + self._open_exposure_local()
             self.peak_equity = max(self.peak_equity, self.account_balance)
             self._save_state()
         except Exception as e:
@@ -930,7 +961,8 @@ class SignalTracker:
     def _refresh_equity(self, cur, price_lookup: Dict[str, float]) -> None:
         if self.mode == "real":
             self.cash = self._read_executor_balance()
-            real_equity = self.cash + self._open_exposure(cur)
+            quote_equity = self._read_executor_quote_equity()
+            real_equity = quote_equity + self._open_exposure(cur)
         else:
             real_equity = (
                 self._compute_real_equity(cur, price_lookup)
@@ -1362,16 +1394,58 @@ class SignalTracker:
     # ══════════════════════════════════════════════════════════════
     # ORDER FILL POLLING
     # ══════════════════════════════════════════════════════════════
+    @staticmethod
+    def _order_matched_qty(order: Optional[Dict[str, Any]]) -> float:
+        """Matched size only. Never treat the requested amount as a fill."""
+        if not isinstance(order, dict):
+            return 0.0
+        matched = safe_float(order.get("matched_amount")) or 0.0
+        if matched > 0:
+            return float(matched)
+        raw = order.get("raw")
+        if isinstance(raw, dict):
+            raw_matched = safe_float(raw.get("matchedAmount") or raw.get("matched_amount")) or 0.0
+            if raw_matched > 0:
+                return float(raw_matched)
+        return 0.0
+
+    def _cancel_unfilled_buy(self, order_id: Optional[Any], symbol: str) -> None:
+        if not self.executor or not order_id:
+            return
+        try:
+            self.executor.cancel_order(order_id, symbol)
+            logger.warning("[REAL] Cancelled unfilled buy %s id=%s", symbol, order_id)
+        except Exception as exc:
+            logger.error(
+                "[REAL] Could not cancel unfilled buy %s id=%s: %s",
+                symbol, order_id, exc,
+            )
+
+    def _wait_for_base_balance(self, asset: str, min_qty: float, timeout: float = 6.0) -> float:
+        if not asset or min_qty <= 0:
+            return 0.0
+        deadline = time.time() + timeout
+        last = 0.0
+        while time.time() < deadline:
+            held = self._get_fresh_executor_balance(asset)
+            last = float(held or 0.0)
+            if last >= min_qty * 0.5:
+                return last
+            time.sleep(0.5)
+        return last
+
     def _wait_for_fill(
         self,
         order_id: str,
         symbol: str,
-        timeout: float = FILL_POLL_TIMEOUT,
+        timeout: Optional[float] = None,
         initial_delay: float = 0.4,
     ) -> Optional[Dict[str, Any]]:
         if not self.executor or not order_id:
             return None
 
+        if timeout is None:
+            timeout = FILL_POLL_TIMEOUT
         time.sleep(initial_delay)
         deadline = time.time() + timeout
         last_status = None
@@ -1385,18 +1459,15 @@ class SignalTracker:
                 continue
 
             st = str(status.get("status") or "").lower()
+            matched = self._order_matched_qty(status)
             if st != last_status:
-                logger.debug("Order %s status: %s", order_id, st)
+                logger.debug("Order %s status: %s matched=%.8f", order_id, st, matched)
                 last_status = st
 
-            if st in self._filled_statuses():
-                return status
             if st in ("canceled", "cancelled", "rejected"):
                 return None
-            if st == "partial":
-                matched = float(status.get("matched_amount") or 0)
-                if matched > 0:
-                    return status
+            if matched > 0:
+                return status
 
             time.sleep(FILL_POLL_INTERVAL)
 
@@ -1481,51 +1552,47 @@ class SignalTracker:
 
             order_status = str(buy_order.get("status") or "").lower()
             order_id = buy_order.get("order_id")
+            matched_qty = self._order_matched_qty(buy_order)
 
-            if order_status in ("open", "partial"):
+            if matched_qty <= 0:
                 logger.info(
                     "Buy order for %s is %s (id=%s), polling for fill...",
-                    symbol, order_status, order_id,
+                    symbol, order_status or "open", order_id,
                 )
                 filled = self._wait_for_fill(order_id, symbol) if order_id else None
                 if filled is None:
                     logger.warning("Buy order for %s did not fill in time; cancelling.", symbol)
-                    if order_id:
-                        try:
-                            self.executor.cancel_order(order_id, symbol)
-                        except Exception as e:
-                            logger.warning("Cancel failed for %s: %s", symbol, e)
+                    self._cancel_unfilled_buy(order_id, symbol)
                     return False
                 buy_order = filled
-                order_status = "filled"
+                order_status = str(buy_order.get("status") or "").lower()
+                matched_qty = self._order_matched_qty(buy_order)
 
-            if order_status not in self._filled_statuses():
-                logger.warning(
-                    "Real buy order for %s not filled (status=%s). Not recording position.",
-                    symbol, order_status,
-                )
-                return False
-
-            matched_qty = float(
-                buy_order.get("matched_amount")
-                or buy_order.get("executed_qty")
-                or 0.0
-            )
             if matched_qty <= 0:
                 logger.warning(
-                    "Buy order for %s reported filled but matched_amount=0. "
-                    "Not recording position.",
-                    symbol,
+                    "Real buy order for %s not filled (status=%s matched=0). Not recording position.",
+                    symbol, order_status,
                 )
+                self._cancel_unfilled_buy(order_id, symbol)
                 return False
 
             executed_price = float(buy_order.get("executed_price") or entry_price)
             if executed_price <= 0:
                 executed_price = entry_price
 
+            base_asset = self._extract_base_asset(symbol)
+            held = self._wait_for_base_balance(base_asset, matched_qty)
+            if held <= 0:
+                logger.error(
+                    "[REAL] Buy %s matched=%.8f but wallet has 0 %s; cancelling leftover buy",
+                    symbol, matched_qty, base_asset or symbol,
+                )
+                self._cancel_unfilled_buy(order_id, symbol)
+                return False
+
             entry_price = executed_price
-            pos_size = matched_qty
-            notional = executed_price * matched_qty
+            pos_size = min(matched_qty, held)
+            notional = executed_price * pos_size
             entry_fee = notional * fee_pct / 100.0
             self._refresh_cash_from_executor()
 
@@ -1555,13 +1622,22 @@ class SignalTracker:
                     "attempting emergency exit",
                     symbol,
                 )
+                held = self._get_fresh_executor_balance(self._extract_base_asset(symbol)) or 0.0
+                if float(held) <= 0:
+                    logger.critical(
+                        "[REAL][SAFETY] Wallet has no %s to protect or sell; discarding local row",
+                        symbol,
+                    )
+                    cur.execute("DELETE FROM trades WHERE trade_uid=?", (trade_uid,))
+                    return False
                 try:
                     emergency = self.executor.place_order(
                         symbol=symbol, side="sell", order_type="market",
-                        quantity=pos_size, price=None,
+                        quantity=min(pos_size, float(held)), price=None,
                     )
                     emergency_status = str((emergency or {}).get("status") or "").lower()
-                    if emergency_status in self._filled_statuses():
+                    emergency_qty = self._order_matched_qty(emergency)
+                    if emergency_status in self._filled_statuses() or emergency_qty > 0:
                         logger.critical(
                             "[REAL][SAFETY] Emergency exit completed for %s; "
                             "no unprotected position retained",
@@ -1847,6 +1923,8 @@ class SignalTracker:
 
                     if self.trading_halted:
                         stats["halted"] = 1
+                    elif not getattr(self, "allow_new_entries", True):
+                        logger.debug("New entries disabled for this tracker (monitor-only).")
                     else:
                         cooldowns = self._active_cooldowns(cur)
                         cur.execute("SELECT DISTINCT asset_key FROM trades WHERE status='open'")

@@ -7,6 +7,8 @@ from tkinter import ttk
 from typing import Any, Dict, Optional
 
 from gui.ui_theme import Theme, Styles
+from gui.gui_helpers import ConfirmDialog
+from trading.execution_mode import LIVE, PAPER, normalize_execution_mode
 
 logger = logging.getLogger(__name__)
 T = Theme
@@ -49,9 +51,11 @@ class UnifiedTradingWindow(tk.Toplevel):
         style = ttk.Style(self)
         Styles.apply(style)
 
+        self._build_mode_banner()
+
         # Build notebook and tabs
         self._nb = ttk.Notebook(self)
-        self._nb.pack(fill="both", expand=True, padx=10, pady=10)
+        self._nb.pack(fill="both", expand=True, padx=10, pady=(6, 10))
 
         # Store panels in a dict for easy access and cleanup
         self._panels: Dict[str, tk.Widget] = {}
@@ -72,6 +76,104 @@ class UnifiedTradingWindow(tk.Toplevel):
 
         # Bind close event
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.refresh_execution_mode()
+
+    def _build_mode_banner(self) -> None:
+        self._mode_bar = tk.Frame(self, bg=T.BG_PANEL, highlightthickness=1, highlightbackground=T.BORDER)
+        self._mode_bar.pack(fill="x", padx=10, pady=(10, 0))
+        inner = tk.Frame(self._mode_bar, bg=T.BG_PANEL)
+        inner.pack(fill="x", padx=12, pady=8)
+        self._mode_label = tk.Label(
+            inner,
+            text="Mode: PAPER",
+            font=T.font(size=T.FONT_MD, weight="bold"),
+            bg=T.BG_PANEL,
+            fg=T.SUCCESS_DARK,
+            anchor="w",
+        )
+        self._mode_label.pack(side="left")
+        tk.Button(
+            inner,
+            text="Use Live",
+            font=T.font(size=T.FONT_SM, weight="bold"),
+            bg=T.DANGER,
+            fg=T.TEXT_ON_PRIMARY,
+            relief="flat",
+            cursor="hand2",
+            padx=T.PAD_LG,
+            pady=4,
+            bd=0,
+            command=self._switch_to_live,
+        ).pack(side="right", padx=(6, 0))
+        tk.Button(
+            inner,
+            text="Use Paper",
+            font=T.font(size=T.FONT_SM, weight="bold"),
+            bg=T.SUCCESS,
+            fg=T.TEXT_ON_PRIMARY,
+            relief="flat",
+            cursor="hand2",
+            padx=T.PAD_LG,
+            pady=4,
+            bd=0,
+            command=self._switch_to_paper,
+        ).pack(side="right")
+
+    def refresh_execution_mode(self) -> None:
+        mode = normalize_execution_mode(getattr(self.main_app, "execution_mode", PAPER))
+        live_on = bool(getattr(self.main_app, "real_auto_enabled", False))
+        if mode == LIVE:
+            extra = "entries ON" if live_on else "entries paused — press Start on Real tab"
+            self._mode_label.config(
+                text=f"Mode: LIVE  |  paper stopped  |  {extra}",
+                fg=T.DANGER,
+            )
+        else:
+            self._mode_label.config(
+                text="Mode: PAPER  |  simulated only  |  no Nobitex orders",
+                fg=T.SUCCESS_DARK,
+            )
+        paper = self._panels.get(self.TAB_PAPER)
+        refresh_paper = getattr(paper, "refresh_execution_mode", None)
+        if callable(refresh_paper):
+            try:
+                refresh_paper()
+            except Exception:
+                pass
+        real = self._panels.get(self.TAB_REAL)
+        refresh_real = getattr(real, "refresh_execution_mode", None)
+        if callable(refresh_real):
+            try:
+                refresh_real()
+            except Exception:
+                pass
+
+    def _switch_to_paper(self) -> None:
+        setter = getattr(self.main_app, "set_execution_mode", None)
+        if callable(setter):
+            setter(PAPER, persist=True, reason="trading_window")
+        self.refresh_execution_mode()
+
+    def _switch_to_live(self) -> None:
+        current = normalize_execution_mode(getattr(self.main_app, "execution_mode", PAPER))
+        if current != LIVE:
+            ok = ConfirmDialog.ask(
+                self,
+                title="Switch to Live trading?",
+                message="Paper entries will stop. Live orders stay paused until you press Start.",
+                detail="Only continue after paper results look acceptable. This uses real money on Nobitex.",
+                yes_text="Switch to Live",
+                no_text="Stay on Paper",
+                danger=True,
+            )
+            if not ok:
+                return
+        setter = getattr(self.main_app, "set_execution_mode", None)
+        if callable(setter):
+            setter(LIVE, persist=True, reason="trading_window")
+        self.refresh_execution_mode()
+        if self.TAB_REAL in self._panels:
+            self._nb.select(self._panels[self.TAB_REAL])
 
     # -------------------------------------------------------------------------
     # Tab creation

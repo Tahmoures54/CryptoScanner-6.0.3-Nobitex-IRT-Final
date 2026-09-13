@@ -43,7 +43,12 @@ def test_chase_limit_respects_user_cap(tracker):
     ...
 
 def test_export_journal(tracker, tmp_path):
-    # چند معامله باز و بسته کن
+    tracker.confirmation_enabled = False
+    tracker.process_new_signals([{
+        "Symbol": "BTC", "Price": 100.0, "Signal": "Buy Signal",
+        "Score": 30, "Volume": 1_000_000, "Market Cap": 100_000_000,
+        "Risk": "Low", "24h Change (%)": 2.0,
+    }])
     n = tracker.export_journal(tmp_path/"journal.csv")
     assert n > 0
     assert (tmp_path/"journal.csv").exists()

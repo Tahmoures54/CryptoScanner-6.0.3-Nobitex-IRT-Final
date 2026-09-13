@@ -25,6 +25,7 @@ from gui.trading_ui_helpers import (
     make_tree,
 )
 from core.utils import safe_float
+from trading.execution_mode import LIVE, PAPER, normalize_execution_mode
 
 logger = logging.getLogger(__name__)
 T = Theme
@@ -245,9 +246,44 @@ class PaperTradingPanel(tk.Frame):
         main = tk.Frame(self._trades_tab, bg=T.BG_APP, padx=T.PAD_MD, pady=T.PAD_MD)
         main.pack(fill="both", expand=True)
 
+        self._mode_banner = tk.Label(
+            main,
+            text="PAPER mode — simulated trades only. No Nobitex orders.",
+            font=T.font(size=T.FONT_SM, weight="bold"),
+            bg=T.SUCCESS_BG,
+            fg=T.SUCCESS_DARK,
+            anchor="w",
+            padx=T.PAD_MD,
+            pady=T.PAD_SM,
+        )
+        self._mode_banner.pack(fill="x", pady=(0, T.PAD_MD))
+        self.refresh_execution_mode()
+
         self._build_stats_cards(main)
         self._build_action_bar(main)
         self._build_tree(main)
+
+    def refresh_execution_mode(self) -> None:
+        if not hasattr(self, "_mode_banner"):
+            return
+        try:
+            if not self._mode_banner.winfo_exists():
+                return
+        except Exception:
+            return
+        mode = normalize_execution_mode(getattr(self.main_app, "execution_mode", PAPER))
+        if mode == LIVE:
+            self._mode_banner.config(
+                text="Paper entries STOPPED — app is in Live mode. Numbers below are simulated leftover/history only.",
+                bg=T.WARNING_BG if hasattr(T, "WARNING_BG") else T.BG_PANEL,
+                fg=T.DANGER,
+            )
+        else:
+            self._mode_banner.config(
+                text="PAPER mode — simulated trades only. No Nobitex orders. Switch to Live after you are satisfied, then press Start.",
+                bg=T.SUCCESS_BG if hasattr(T, "SUCCESS_BG") else T.BG_PANEL,
+                fg=T.SUCCESS_DARK,
+            )
 
     def _build_log_tab(self) -> None:
         log_frame = tk.Frame(self._log_tab, bg="#0A1628", highlightthickness=1, highlightbackground=T.PRIMARY)

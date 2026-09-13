@@ -12,10 +12,14 @@ This build uses CoinMarketCap for global market intelligence and Nobitex as the 
 7. On exit, cancel the old protection and confirm the sell fill.
 
 ## Important
-- Paper Trading remains separate from the real executor.
-- Real auto-trading is enabled only when the Nobitex bot configuration is valid and live execution is READY.
-- Nobitex documents that market orders can be rejected for insufficient balance, invalid market, minimum order size, duplicate orders, etc.; the application logs the exchange response.
-- No strategy can guarantee profit or pay for a trip. Use a small allocation first and keep the stop-loss active.
+- Paper and live never open at the same time. The app starts in **Paper**. Run paper until you are satisfied, switch to **Live** (this stops paper entries), then press **Start** on the Real tab.
+- Switching back to Paper stops new Nobitex buys. Any leftover live positions are still monitored.
+- A live buy is recorded only after Nobitex reports a matched amount greater than zero and the wallet actually holds the coin. An accepted-but-unfilled order is cancelled, not treated as a position.
+- If a filled live buy cannot get an exchange-side stop, the bot tries an emergency market sell. It does not keep a local position when the wallet has none of that coin.
+- `Clear Database` is blocked while tracked live positions or Nobitex open orders exist.
+- Drawdown uses the full IRT wallet (including funds locked in open orders), so an unfilled buy does not look like a 20%+ loss.
+- Nobitex can reject orders for insufficient balance, invalid market, minimum size, `OverValueOrder`, duplicates, etc.; the application logs the exchange response.
+- No strategy can guarantee profit. Use a small allocation first and keep the stop-loss active.
 
 Official Nobitex API documentation:
 

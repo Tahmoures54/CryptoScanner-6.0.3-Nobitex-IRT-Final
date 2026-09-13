@@ -89,12 +89,17 @@ def _coerce_order_ref(order_id: Optional[str], symbol: Optional[str]) -> Tuple[s
     return str(order_id), None if symbol is None else str(symbol)
 
 
+def _wallet_total(wallet: Dict[str, Any]) -> float:
+    """Full wallet size including funds locked in open orders."""
+    return max(0.0, _safe_float(wallet.get("balance", wallet.get("available", 0))))
+
+
 def _wallet_spendable(wallet: Dict[str, Any]) -> float:
     """Prefer documented activeBalance; otherwise total minus blockedBalance."""
     active = wallet.get("activeBalance")
     if active not in (None, ""):
         return _safe_float(active)
-    total = _safe_float(wallet.get("balance", wallet.get("available", 0)))
+    total = _wallet_total(wallet)
     blocked = _safe_float(wallet.get("blockedBalance", 0))
     return max(0.0, total - blocked)
 
@@ -139,6 +144,7 @@ class NobitexClient(ExchangeBase):
 
         self._symbol_support_cache: Dict[str, bool] = {}
         self._balance_cache: Dict[str, float] = {}
+        self._balance_total_cache: Dict[str, float] = {}
         self._balance_cache_timestamp: float = 0.0
         self._balance_cache_ttl: float = 300.0
 
@@ -451,6 +457,7 @@ class NobitexClient(ExchangeBase):
                 raise RuntimeError(f"Nobitex wallets list failed: {data.get('message', data)}")
             wallets = data.get("wallets", [])
             balances: Dict[str, float] = {}
+            totals: Dict[str, float] = {}
             for wallet in wallets:
                 if not isinstance(wallet, dict):
                     continue
@@ -458,17 +465,22 @@ class NobitexClient(ExchangeBase):
                 if not asset:
                     continue
                 value = _wallet_spendable(wallet)
+                total = _wallet_total(wallet)
                 balances[asset] = value
+                totals[asset] = total
                 if asset == "RLS":
                     balances["IRT"] = value
+                    totals["IRT"] = total
                 elif asset == "IRT":
                     balances["RLS"] = value
+                    totals["RLS"] = total
             self.mark_authenticated()
             self.balance_status = self.BALANCE_AVAILABLE
             self.last_balance_error = None
             self.last_balance_timestamp = time.time()
             with self._lock:
                 self._balance_cache = balances.copy()
+                self._balance_total_cache = totals.copy()
                 self._balance_cache_timestamp = time.time()
             logger.info("Nobitex balances loaded: %s", list(balances.keys())[:5])
             return balances
@@ -491,6 +503,19 @@ class NobitexClient(ExchangeBase):
             self.mark_balance_available(value)
         return value
 
+    def get_balance_total(self, asset: str, force_refresh: bool = False) -> float:
+        """Wallet total including funds reserved by unmatched open orders."""
+        self.get_balances(force_refresh=force_refresh)
+        asset = (asset or "").upper()
+        lookup_asset = "RLS" if asset in ("IRT", "IRR") else asset
+        with self._lock:
+            totals = self._balance_total_cache
+        if lookup_asset in totals:
+            return float(totals[lookup_asset])
+        if asset in totals:
+            return float(totals[asset])
+        return self.get_balance(asset)
+
     def get_balance_fresh(self, asset: str) -> float:
         """Bypass the 5-minute wallet cache. Missing coin in a loaded snapshot is 0."""
         self.invalidate_balance_cache()
@@ -510,6 +535,7 @@ class NobitexClient(ExchangeBase):
     def invalidate_balance_cache(self) -> None:
         with self._lock:
             self._balance_cache = {}
+            self._balance_total_cache = {}
             self._balance_cache_timestamp = 0.0
 
     def place_order(
@@ -691,7 +717,12 @@ class NobitexClient(ExchangeBase):
         unmatched_amount = _safe_float(unmatched_raw) if unmatched_present else None
 
         if status_raw in ("done", "filled", "matched", "complete", "completed"):
-            status = "filled"
+            if matched_amount > 0 and (not unmatched_present or unmatched_amount == 0):
+                status = "filled"
+            elif matched_amount > 0:
+                status = "partial"
+            else:
+                status = "open"
         elif status_raw in ("canceled", "cancelled", "rejected"):
             status = "canceled"
         elif status_raw in ("new", "active", "open", "pending", "inactive"):
@@ -703,6 +734,8 @@ class NobitexClient(ExchangeBase):
                 status = "open"
         else:
             status = status_raw or "unknown"
+            if matched_amount <= 0 and status in ("filled", "closed", "complete", "completed", "done"):
+                status = "open"
 
         price_value = raw.get("price")
         if price_value is None or str(price_value).lower() == "market":

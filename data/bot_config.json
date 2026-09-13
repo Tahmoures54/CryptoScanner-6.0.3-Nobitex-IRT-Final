@@ -35,6 +35,7 @@
   "entry_cooldown_seconds": 480,
   "check_interval_seconds": 15,
   "enable_auto_trading": true,
+  "execution_mode": "paper",
   "trading_fee_pct": 0.1,
   "max_new_entries_per_cycle": 1,
   "confirmation_enabled": false,

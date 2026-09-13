@@ -40,6 +40,7 @@ from gui.trading_ui_helpers import (
 from trading.bot_config import BotConfig, load_config, save_config
 from signal_tracker import SignalTracker
 from trading.trader import TradingBot
+from trading.execution_mode import LIVE, PAPER, normalize_execution_mode
 from core.irt_money import display_quote_label, parse_amount
 
 if TYPE_CHECKING:
@@ -380,18 +381,30 @@ class RealTradingPanel(tk.Frame):
         except Exception:
             pass
 
-    def _sync_live_auto_entries(self, enabled: bool) -> None:
+    def _sync_live_auto_entries(self, enabled: bool) -> bool:
         setter = getattr(self.app, "set_real_auto_entries", None)
         if callable(setter):
-            setter(enabled)
-        else:
-            self.app.real_auto_enabled = bool(enabled)
-            if enabled:
-                ensure = getattr(self.app, "ensure_real_auto_cycle", None)
-                if callable(ensure):
-                    ensure()
+            return bool(setter(enabled))
+        self.app.real_auto_enabled = bool(enabled)
+        if enabled:
+            ensure = getattr(self.app, "ensure_real_auto_cycle", None)
+            if callable(ensure):
+                ensure()
         if self.tracker:
             self.tracker.auto_trading_enabled = True
+            self.tracker.allow_new_entries = bool(enabled)
+        return True
+
+    def refresh_execution_mode(self) -> None:
+        mode = normalize_execution_mode(getattr(self.app, "execution_mode", PAPER))
+        live_on = bool(getattr(self.app, "real_auto_enabled", False))
+        if hasattr(self, "_mode_hdr") and self._mode_hdr.winfo_exists():
+            if mode == LIVE:
+                self._mode_hdr.config(
+                    text="Mode: LIVE" + (" | entries ON" if live_on else " | press Start"),
+                )
+            else:
+                self._mode_hdr.config(text="Mode: PAPER | live entries off")
 
     def _on_bot_ready(self) -> None:
         if self._closing:
@@ -406,7 +419,7 @@ class RealTradingPanel(tk.Frame):
                 bg=T.SUCCESS_DARK,
             )
             self.log(
-                "Live Nobitex bot is already running. Press Stop to pause new entries, Start to resume.",
+                "Nobitex is connected. Paper is the default. Switch to Live, then press Start for real orders.",
                 "success",
             )
             if auto_on and self._is_live_exchange():
@@ -415,8 +428,14 @@ class RealTradingPanel(tk.Frame):
                 self.auto_trade_enabled = False
         else:
             self._set_running_ui(False)
-            self._status_bar.config(text="🟢  Bot initialized. Press Start to trade.", bg=T.SUCCESS_DARK)
-            self.log("Bot initialized successfully. Press Start to enable live entries.", "success")
+            self._status_bar.config(
+                text="🟢  Bot initialized. Paper is active. Switch to Live, then Start.",
+                bg=T.SUCCESS_DARK,
+            )
+            self.log(
+                "Bot initialized. Default is Paper (simulated). Switch to Live, then press Start for Nobitex orders.",
+                "success",
+            )
         self._update_balance_display()
 
     def _on_bot_init_failed(self) -> None:
@@ -505,6 +524,12 @@ class RealTradingPanel(tk.Frame):
             font=T.font(size=T.FONT_LG, weight="bold"),
             bg=T.PRIMARY, fg=T.TEXT_ON_PRIMARY,
         ).pack(side="left", padx=T.PAD_2XL)
+        self._mode_hdr = tk.Label(
+            bar, text="Mode: PAPER",
+            font=T.font(size=T.FONT_SM, weight="bold"),
+            bg=T.PRIMARY, fg=T.TEXT_ON_PRIMARY,
+        )
+        self._mode_hdr.pack(side="left", padx=T.PAD_LG)
 
         self._balance_label = tk.Label(
             bar, text="Balance: $0.00",
@@ -696,6 +721,23 @@ class RealTradingPanel(tk.Frame):
         try:
             self._apply_config_to_tracker()
             if self._is_live_exchange():
+                current = normalize_execution_mode(getattr(self.app, "execution_mode", PAPER))
+                if current != LIVE:
+                    ok = ConfirmDialog.ask(
+                        self,
+                        title="Switch to Live trading?",
+                        message="Paper entries will stop. Start will send real Nobitex orders.",
+                        detail="Only continue after paper results look acceptable.",
+                        yes_text="Switch to Live and Start",
+                        no_text="Stay on Paper",
+                        danger=True,
+                    )
+                    if not ok:
+                        self.log("Start cancelled: still in paper mode.", "warning")
+                        return
+                    setter = getattr(self.app, "set_execution_mode", None)
+                    if callable(setter):
+                        setter(LIVE, persist=True, reason="real_tab_start")
                 self._sync_tracker_balance_from_exchange()
                 try:
                     self.tracker.reconcile_open_positions()
@@ -712,7 +754,10 @@ class RealTradingPanel(tk.Frame):
             if not self.bot.running:
                 self.bot.start()
             if self._is_live_exchange():
-                self._sync_live_auto_entries(True)
+                armed = self._sync_live_auto_entries(True)
+                if not armed:
+                    self.log("Live entries were not armed. Switch to Live first.", "warning")
+                    return
                 self._auto_var.set(True)
                 self._auto_status_lbl.config(text="✅ Global Lead Active", fg=T.SUCCESS_DARK)
                 self.auto_trade_enabled = False
@@ -720,6 +765,7 @@ class RealTradingPanel(tk.Frame):
             self._set_running_ui(True)
             actual_mode = self.bot.exchange_name.upper() if self.bot.exchange_name else "UNKNOWN"
             self.log(f"✅ Bot started. Mode: {actual_mode} | auto entries ON", "success")
+            self.refresh_execution_mode()
             if actual_mode == "SIMULATOR" and str(self.config.exchange).lower() != "simulator":
                 self.log(
                     "⚠️  WARNING: Bot is running in SIMULATOR mode, not live trading. Check API keys.",
@@ -1034,7 +1080,17 @@ class RealTradingPanel(tk.Frame):
         if not self.tracker or not self.bot:
             self.log("Cannot trade: tracker or bot not ready.", "error")
             return
-        if not self.bot.running:
+        if self._is_live_exchange():
+            mode = normalize_execution_mode(getattr(self.app, "execution_mode", PAPER))
+            if mode != LIVE or not bool(getattr(self.app, "real_auto_enabled", False)):
+                messagebox.showwarning(
+                    "Live entries off",
+                    "Paper and live cannot run together.\n"
+                    "Switch to Live, then press Start, then send a real order.",
+                    parent=self,
+                )
+                return
+        elif not self.bot.running:
             messagebox.showwarning(
                 "Bot Stopped",
                 "Start the bot before sending a live order.",
@@ -1120,7 +1176,12 @@ class RealTradingPanel(tk.Frame):
             self.log("Cannot process signal: tracker or bot not ready.", "error")
             return
         manual = any(bool(s.get("_manual")) for s in signals if isinstance(s, dict))
-        if not manual and not self.auto_trade_enabled:
+        if self._using_app_live_tracker:
+            mode = normalize_execution_mode(getattr(self.app, "execution_mode", PAPER))
+            if mode != LIVE or not getattr(self.tracker, "allow_new_entries", False):
+                self.log("Ignored live signal: Paper is active or live entries are paused.", "warning")
+                return
+        elif not manual and not self.auto_trade_enabled:
             self.log("Auto-trade is disabled, ignoring scanner signal.", "warning")
             return
         with self._signal_lock:
@@ -1352,11 +1413,38 @@ class BotSettingsWindow(BaseDialog):
             reset_btn.pack(side="left", padx=T.PAD_SM, pady=T.PAD_MD)
 
     def _build_content(self) -> None:
+        self._build_execution_mode_section(self.scrollable_frame)
         self._build_exchange_section(self.scrollable_frame)
         self._build_capital_section(self.scrollable_frame)
         self._build_strategy_section(self.scrollable_frame)
         self._build_risk_section(self.scrollable_frame)
         self._build_extra_section(self.scrollable_frame)
+
+    def _build_execution_mode_section(self, parent) -> None:
+        mf = tk.LabelFrame(
+            parent, text="🧪  Execution mode (paper XOR live)",
+            font=T.font(size=T.FONT_SM, weight="bold"),
+            bg=T.BG_APP, fg=T.PRIMARY, padx=T.PAD_MD, pady=T.PAD_MD,
+        )
+        mf.pack(fill="x", pady=(0, T.PAD_MD))
+        current = normalize_execution_mode(getattr(self.config, "execution_mode", PAPER))
+        self._execution_mode_var = tk.StringVar(value=current)
+        tk.Label(
+            mf,
+            text="Paper and live never open together. Run paper first. When satisfied, switch to Live, then press Start.",
+            font=T.font(size=T.FONT_XS),
+            bg=T.BG_APP, fg=T.TEXT_MUTED, wraplength=620, justify="left",
+        ).pack(anchor="w", pady=(0, T.PAD_SM))
+        row = tk.Frame(mf, bg=T.BG_APP)
+        row.pack(anchor="w")
+        ttk.Radiobutton(
+            row, text="Paper only (no Nobitex orders)",
+            variable=self._execution_mode_var, value=PAPER,
+        ).pack(side="left", padx=(0, T.PAD_LG))
+        ttk.Radiobutton(
+            row, text="Live Nobitex (stops paper entries)",
+            variable=self._execution_mode_var, value=LIVE,
+        ).pack(side="left")
 
     def _quote_label(self) -> str:
         quote = ""
@@ -1426,13 +1514,12 @@ class BotSettingsWindow(BaseDialog):
             self._strategy_vars[key] = var
             row += 1
 
-        self._enable_auto_trading_var = tk.BooleanVar(
-            value=bool(getattr(self.config, "enable_auto_trading", True))
-        )
-        ttk.Checkbutton(
-            sf, text="Enable auto trading (real movement)",
-            variable=self._enable_auto_trading_var,
-        ).grid(row=row, column=1, sticky="w", pady=T.PAD_XS)
+        tk.Label(
+            sf,
+            text="Live Start on the Real tab sends Nobitex orders. Saving Live here only switches mode; entries stay paused until Start.",
+            font=T.font(size=T.FONT_XS),
+            bg=T.BG_APP, fg=T.TEXT_MUTED, wraplength=620, justify="left",
+        ).grid(row=row, column=0, columnspan=2, sticky="w", pady=(T.PAD_SM, 0))
 
     def _build_exchange_section(self, parent) -> None:
         ef = tk.LabelFrame(
@@ -1709,8 +1796,8 @@ class BotSettingsWindow(BaseDialog):
             for key, value in defaults.items():
                 if key in self._strategy_vars:
                     self._strategy_vars[key].set(value)
-        if hasattr(self, "_enable_auto_trading_var"):
-            self._enable_auto_trading_var.set(True)
+        if hasattr(self, "_execution_mode_var"):
+            self._execution_mode_var.set(PAPER)
         if hasattr(self, "_position_size_mode_var"):
             self._position_size_mode_var.set("fixed")
         if hasattr(self, "_min_notional_var"):
@@ -1788,8 +1875,26 @@ class BotSettingsWindow(BaseDialog):
         self.config.strategy = "global_lead_local_lag"
         self.config.global_signal_source = "CoinMarketCap"
         self.config.quote_unit = "rial"
-        if hasattr(self, "_enable_auto_trading_var"):
-            self.config.enable_auto_trading = bool(self._enable_auto_trading_var.get())
+        mode = normalize_execution_mode(
+            self._execution_mode_var.get() if hasattr(self, "_execution_mode_var") else PAPER
+        )
+        prev_mode = normalize_execution_mode(getattr(self.config, "execution_mode", PAPER))
+        if mode == LIVE and prev_mode != LIVE:
+            ok = ConfirmDialog.ask(
+                self.panel,
+                title="Save Live mode?",
+                message="Paper entries will stop. Live orders still wait for Start on the Real tab.",
+                detail="Do not enable Live until paper results look acceptable.",
+                yes_text="Save Live mode",
+                no_text="Keep Paper",
+                danger=True,
+            )
+            if not ok:
+                mode = PAPER
+                if hasattr(self, "_execution_mode_var"):
+                    self._execution_mode_var.set(PAPER)
+        self.config.execution_mode = mode
+        self.config.enable_auto_trading = True
         int_keys = {
             "check_interval_seconds", "movement_lookback_scans",
             "max_new_entries_per_cycle", "min_confirm_scans",
@@ -1817,10 +1922,11 @@ class BotSettingsWindow(BaseDialog):
                 app._configure_global_lead_engine(self.config)
             except Exception as exc:
                 logger.warning("Could not apply Global Lead settings: %s", exc)
-        if hasattr(self, "_enable_auto_trading_var"):
-            setter = getattr(app, "set_real_auto_entries", None)
-            if callable(setter):
-                setter(bool(self.config.enable_auto_trading))
+        if hasattr(app, "set_execution_mode"):
+            try:
+                app.set_execution_mode(mode, persist=False, reason="settings")
+            except Exception as exc:
+                logger.warning("Could not apply execution mode: %s", exc)
         if hasattr(app, "real_signal_tracker") and app.real_signal_tracker is not None:
             app.real_signal_tracker.max_new_entries_per_cycle = int(
                 getattr(self.config, "max_new_entries_per_cycle", 1) or 1
@@ -1843,16 +1949,12 @@ class BotSettingsWindow(BaseDialog):
             app.real_signal_tracker.take_profit_percent = float(
                 getattr(self.config, "take_profit_percent", 0.0) or 0.0
             )
-        if hasattr(app, "_configure_paper_tracker"):
-            try:
-                app._configure_paper_tracker()
-            except Exception:
-                pass
         self.panel.refresh_signals()
+        self.panel.refresh_execution_mode()
         messagebox.showinfo(
             "Saved",
             "Bot configuration saved.\n"
-            "Trading settings live here (Bot → Settings), not in the market scanner.\n"
+            "Paper and live never run together. Live Start sends Nobitex orders.\n"
             "IRT amounts are Rial, same as Nobitex.\n"
             "Restart the bot to apply exchange key changes.",
             parent=self.panel,

@@ -68,7 +68,9 @@ from trading.bot_config import (
     DEFAULT_MAX_TOTAL_EXPOSURE_PCT,
     DEFAULT_MIN_NOTIONAL_QUOTE,
     load_config,
+    save_config,
 )
+from trading.execution_mode import LIVE, PAPER, cycle_plan, normalize_execution_mode
 from trading.global_lead_engine import GlobalLeadEngine
 
 from binance_data_provider import build_binance_dataframe
@@ -150,6 +152,7 @@ class CryptoScannerApp:
         self.signal_tracker.auto_trading_enabled = False
         self.real_signal_tracker = None
         self.real_auto_enabled = False
+        self.execution_mode = PAPER
         self._nobitex_history = {}
         self._nobitex_last_scan = 0.0
         self.global_lead_engine = None
@@ -196,7 +199,7 @@ class CryptoScannerApp:
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_closing)
         self.root.after(100, self._post_init)
-        if self.real_signal_tracker is not None:
+        if self.trading_bot is not None:
             self._real_auto_job = self.root.after(5000, self._real_auto_cycle)
 
     def _init_real_auto_trading(self):
@@ -208,7 +211,10 @@ class CryptoScannerApp:
             self.trading_bot = TradingBot.get_instance(config=cfg, auto_start=True)
             is_nobitex = str(getattr(self.trading_bot, "exchange_name", "") or "").lower() == "nobitex"
             live_ready = is_nobitex and bool(getattr(self.trading_bot, "execution_enabled", False))
-            self.real_auto_enabled = bool(getattr(cfg, "enable_auto_trading", True)) and live_ready
+            self.execution_mode = normalize_execution_mode(getattr(cfg, "execution_mode", PAPER))
+            # Never arm live entries at boot. Paper and live must not run together,
+            # and a restart must not send Nobitex orders until the user presses Start.
+            self.real_auto_enabled = False
             self._configure_global_lead_engine(cfg)
             if live_ready:
                 live_cash = max(float(self.trading_bot.current_balance or 0.0), 0.0)
@@ -246,21 +252,26 @@ class CryptoScannerApp:
                 self.real_signal_tracker.trailing_stop_enabled = bool(getattr(cfg, "trailing_stop_enabled", True))
                 self.real_signal_tracker.take_profit_percent = float(getattr(cfg, "take_profit_percent", 0.0))
                 self.real_signal_tracker._sync_balance_from_executor()
-                if self.real_auto_enabled:
-                    logger.info(
-                        "[REAL] Automatic Nobitex trading connected | size=%.0f IRT | mode=%s",
-                        self.real_signal_tracker.fixed_position_quote,
-                        self.real_signal_tracker.position_size_mode,
-                    )
-                else:
-                    logger.info("[REAL] Live Nobitex tracker ready for SEND; 30s auto-scan is off.")
+                logger.info(
+                    "[REAL] Nobitex tracker ready | size=%.0f IRT | mode=%s | entries=off until Live+Start",
+                    self.real_signal_tracker.fixed_position_quote,
+                    self.real_signal_tracker.position_size_mode,
+                )
             else:
-                logger.warning("[REAL] Automatic Nobitex trading is not ready; manual/paper mode remains available.")
-            self._configure_paper_tracker()
+                logger.warning("[REAL] Automatic Nobitex trading is not ready; paper-only mode remains available.")
+            self.set_execution_mode(self.execution_mode, persist=False, reason="startup")
         except Exception as exc:
             logger.error("[REAL] Auto-trading initialization failed: %s", exc, exc_info=True)
             self.real_signal_tracker = None
             self.real_auto_enabled = False
+            self.execution_mode = PAPER
+            try:
+                self._configure_paper_tracker()
+                if self.signal_tracker is not None:
+                    self.signal_tracker.auto_trading_enabled = True
+                    self.signal_tracker.allow_new_entries = True
+            except Exception:
+                pass
 
     def _apply_live_sizing(self, cfg, live_cash: Optional[float] = None) -> None:
         """Keep paper and real trackers on the configured Rial lot size."""
@@ -296,8 +307,72 @@ class CryptoScannerApp:
                 self.real_signal_tracker.fixed_position_quote,
             )
 
+    def set_execution_mode(self, mode, persist: bool = True, reason: str = "") -> str:
+        """Paper XOR live. Switching to live stops paper entries; Start still required."""
+        mode = normalize_execution_mode(mode)
+        prev = normalize_execution_mode(getattr(self, "execution_mode", PAPER))
+        self.execution_mode = mode
+        if self._bot_cfg is not None:
+            self._bot_cfg.execution_mode = mode
+        if persist and self._bot_cfg is not None:
+            try:
+                save_config(self._bot_cfg, self._bot_config_path)
+            except Exception as exc:
+                logger.warning("Could not persist execution_mode: %s", exc)
+
+        if mode == LIVE:
+            if self.signal_tracker is not None:
+                self.signal_tracker.auto_trading_enabled = False
+                self.signal_tracker.allow_new_entries = False
+            if self.real_signal_tracker is not None:
+                self.real_signal_tracker.auto_trading_enabled = True
+                self.real_signal_tracker.allow_new_entries = False
+            self.real_auto_enabled = False
+            logger.info(
+                "[LIVE] Paper entries stopped. Live entries stay paused until Start. %s",
+                reason or "",
+            )
+        else:
+            self.real_auto_enabled = False
+            if self.real_signal_tracker is not None:
+                self.real_signal_tracker.allow_new_entries = False
+                self.real_signal_tracker.auto_trading_enabled = True
+            self._configure_paper_tracker()
+            if self.signal_tracker is not None:
+                self.signal_tracker.auto_trading_enabled = True
+                self.signal_tracker.allow_new_entries = True
+            logger.info(
+                "[PAPER] Live entries stopped. Paper trading is active. %s",
+                reason or "",
+            )
+
+        if prev != mode:
+            logger.info("Execution mode %s -> %s | %s", prev, mode, reason or "switch")
+        self._notify_execution_mode()
+        self.ensure_real_auto_cycle()
+        return mode
+
+    def _notify_execution_mode(self) -> None:
+        root = getattr(self, "root", None)
+        if root is None:
+            return
+        try:
+            children = list(root.winfo_children())
+        except Exception:
+            return
+        for widget in children:
+            refresh = getattr(widget, "refresh_execution_mode", None)
+            if callable(refresh):
+                try:
+                    refresh()
+                except Exception:
+                    pass
+
+    def current_cycle_plan(self) -> Dict[str, Any]:
+        return cycle_plan(getattr(self, "execution_mode", PAPER), bool(self.real_auto_enabled))
+
     def _configure_paper_tracker(self) -> None:
-        """Paper tracker shadows the live engine with simulated fills."""
+        """Paper tracker shadows the engine with simulated fills and isolated cash."""
         st = self.signal_tracker
         if st is None:
             return
@@ -305,13 +380,8 @@ class CryptoScannerApp:
         size = float(
             getattr(cfg, "fixed_position_quote", DEFAULT_FIXED_POSITION_QUOTE) or DEFAULT_FIXED_POSITION_QUOTE
         ) if cfg is not None else DEFAULT_FIXED_POSITION_QUOTE
-        cash = max(
-            float(getattr(cfg, "account_balance", 0.0) or 0.0) if cfg is not None else 0.0,
-            size / 0.90,
-            38_000_000.0,
-        )
-        if self.trading_bot:
-            cash = max(float(getattr(self.trading_bot, "current_balance", 0.0) or 0.0), cash)
+        cash = float(getattr(cfg, "account_balance", 0.0) or 0.0) if cfg is not None else 0.0
+        cash = max(cash, 38_000_000.0)
         st.quote_currency = "IRT"
         st.executor = None
         st.mode = "paper"
@@ -335,19 +405,21 @@ class CryptoScannerApp:
             st.trading_fee_pct = float(getattr(cfg, "trading_fee_pct", 0.1) or 0.1)
             st.max_new_entries_per_cycle = int(getattr(cfg, "max_new_entries_per_cycle", 1) or 1)
             st.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 480) or 0)
-            self._apply_live_sizing(cfg, live_cash=cash)
-        logger.info(
-            "[PAPER] Trend shadow ready | size=%.0f SL=%.2f trail=%.2f act=%.2f TP=%.2f",
-            st.fixed_position_quote, st.stop_loss_pct, st.trailing_distance_pct,
-            getattr(st, "trailing_activation_pct", 0.0), st.take_profit_percent,
-        )
+            self._apply_live_sizing(cfg)
+        if normalize_execution_mode(getattr(self, "execution_mode", PAPER)) == PAPER:
+            logger.info(
+                "[PAPER] Trend shadow ready | size=%.0f SL=%.2f trail=%.2f act=%.2f TP=%.2f",
+                st.fixed_position_quote, st.stop_loss_pct, st.trailing_distance_pct,
+                getattr(st, "trailing_activation_pct", 0.0), st.take_profit_percent,
+            )
 
     def _paper_shadow_global_lead(self, rows: List[Dict[str, Any]]) -> None:
-        if not rows or self.signal_tracker is None:
+        plan = self.current_cycle_plan()
+        if not plan.get("open_paper") or not rows or self.signal_tracker is None:
             return
         st = self.signal_tracker
-        was = st.auto_trading_enabled
-        st.auto_trading_enabled = True
+        if not st.auto_trading_enabled:
+            return
         st.ignore_signal_filters = True
         st.confirmation_enabled = False
         st.pump_threshold_pct = 0.0
@@ -360,8 +432,6 @@ class CryptoScannerApp:
                 )
         except Exception as exc:
             logger.warning("[PAPER][GLOBAL] Paper shadow failed: %s", exc)
-        finally:
-            st.auto_trading_enabled = was
 
     def _configure_global_lead_engine(self, cfg) -> None:
         raw_spread = float(getattr(cfg, "max_nobitex_spread_pct", 1.2) or 1.2)
@@ -386,10 +456,11 @@ class CryptoScannerApp:
             self.global_lead_engine = GlobalLeadEngine(**kwargs)
         else:
             self.global_lead_engine.configure(**kwargs)
+        tag = self.current_cycle_plan().get("scan_tag", "[REAL]")
         logger.info(
-            "[REAL][GLOBAL] Engine filters | pump=%.2f obs=%.2f spread=%.2f "
+            "%s[GLOBAL] Engine filters | pump=%.2f obs=%.2f spread=%.2f "
             "lookback=%d confirm=%d age=%.0fs vol=$%.0f",
-            kwargs["global_pump_pct"], kwargs["min_observed_move_pct"],
+            tag, kwargs["global_pump_pct"], kwargs["min_observed_move_pct"],
             kwargs["max_spread_pct"], kwargs["movement_lookback_scans"],
             kwargs["min_confirm_scans"],
             kwargs["max_global_quote_age_sec"], kwargs["min_global_volume_usd"],
@@ -509,13 +580,19 @@ class CryptoScannerApp:
         return True
 
     def _nobitex_auto_scan(self):
-        """Real strategy: observed CMC/Nobitex movement → trend follow → execute."""
-        if not self.real_signal_tracker or not self.trading_bot:
+        """Same engine for paper and live; entries are exclusive via cycle_plan."""
+        if not self.trading_bot:
+            return
+        plan = self.current_cycle_plan()
+        tag = plan.get("scan_tag", "[REAL]")
+        if self.real_signal_tracker is not None:
+            self.real_signal_tracker.allow_new_entries = bool(plan.get("open_live"))
+        if not plan.get("open_paper") and self.real_signal_tracker is None:
             return
         try:
             local_rows = self.trading_bot.get_all_market_stats("IRT")
             if not local_rows:
-                logger.warning("[REAL][NOBITEX] No local market data; skipping cycle.")
+                logger.warning("%s[NOBITEX] No local market data; skipping cycle.", tag)
                 return
 
             now = time.time()
@@ -561,18 +638,18 @@ class CryptoScannerApp:
             if cfg is not None:
                 self._configure_global_lead_engine(cfg)
                 self._apply_live_sizing(cfg)
-            if not self.real_auto_enabled:
-                logger.debug("[REAL] Auto entries disabled; monitoring open Nobitex positions only.")
+            if not plan.get("evaluate_signals"):
+                logger.debug("%s Auto entries disabled; monitoring open Nobitex positions only.", tag)
             elif self.cmc_client is None:
-                logger.warning("[REAL][GLOBAL] CoinMarketCap API key/client unavailable; no new real entries this cycle.")
+                logger.warning("%s[GLOBAL] CoinMarketCap API key/client unavailable; no new entries this cycle.", tag)
             else:
                 try:
                     local_symbols = [str(r.get("Symbol") or "").upper() for r in live_rows]
                     global_payload = self._fetch_cmc_global_payload(local_symbols)
                     if self.global_lead_engine is None:
-                        logger.warning("[REAL][GLOBAL] Lead engine missing; no new real entries this cycle.")
+                        logger.warning("%s[GLOBAL] Lead engine missing; no new entries this cycle.", tag)
                     elif not global_payload:
-                        logger.warning("[REAL][GLOBAL] CoinMarketCap payload empty; no new real entries this cycle.")
+                        logger.warning("%s[GLOBAL] CoinMarketCap payload empty; no new entries this cycle.", tag)
                     else:
                         usdt_irt = GlobalLeadEngine.usdt_irt_from_rows(live_rows)
                         if not usdt_irt and self.trading_bot:
@@ -584,8 +661,8 @@ class CryptoScannerApp:
                             live_rows, global_payload, usdt_irt or 0.0, now=now
                         )
                         logger.info(
-                            "[REAL][GLOBAL] Filters | %s",
-                            self.global_lead_engine.stats_line(),
+                            "%s[GLOBAL] Filters | %s",
+                            tag, self.global_lead_engine.stats_line(),
                         )
                         min_depth = float(getattr(cfg, "min_ask_depth_quote", 0.0) or 0.0) if cfg else 0.0
                         if min_depth > 0:
@@ -595,43 +672,45 @@ class CryptoScannerApp:
                             ]
                 except Exception as exc:
                     logger.warning(
-                        "[REAL][GLOBAL] Global lead data unavailable: %s",
-                        exc,
-                        exc_info=True,
+                        "%s[GLOBAL] Global lead data unavailable: %s",
+                        tag, exc, exc_info=True,
                     )
 
             candidate_map = {str(x.get("Symbol", "")).upper(): x for x in candidates}
-            for row in live_rows:
-                hit = candidate_map.get(str(row.get("Symbol", "")).upper())
-                if hit:
-                    self._apply_global_lead_hit(row, hit)
-                    logger.info(
-                        "[REAL][GLOBAL→NOBITEX] %s | cmc1h=%.2f%% | obs=%.2f%% | ask=%s IRT | spread=%.2f%% | local_obs=%.2f%% | score=%.1f | signal=%s",
-                        row.get("Symbol"),
-                        float(hit.get("Global1hPct", 0)),
-                        float(hit.get("ObservedGlobalMove (%)", 0)),
-                        f"{float(hit.get('Nobitex Ask', 0) or hit.get('Ask') or row.get('Price') or 0):.8f}",
-                        float(hit.get("Nobitex Spread (%)", 0)),
-                        float(hit.get("ObservedLocalMove (%)", 0)),
-                        float(hit.get("GlobalLeadScore", 0)),
-                        row.get("Signal"),
-                    )
+            if plan.get("evaluate_signals"):
+                for row in live_rows:
+                    hit = candidate_map.get(str(row.get("Symbol", "")).upper())
+                    if hit:
+                        self._apply_global_lead_hit(row, hit)
+                        logger.info(
+                            "%s[GLOBAL→NOBITEX] %s | cmc1h=%.2f%% | obs=%.2f%% | ask=%s IRT | spread=%.2f%% | local_obs=%.2f%% | score=%.1f | signal=%s",
+                            tag,
+                            row.get("Symbol"),
+                            float(hit.get("Global1hPct", 0)),
+                            float(hit.get("ObservedGlobalMove (%)", 0)),
+                            f"{float(hit.get('Nobitex Ask', 0) or hit.get('Ask') or row.get('Price') or 0):.8f}",
+                            float(hit.get("Nobitex Spread (%)", 0)),
+                            float(hit.get("ObservedLocalMove (%)", 0)),
+                            float(hit.get("GlobalLeadScore", 0)),
+                            row.get("Signal"),
+                        )
 
             logger.info(
-                "[REAL] Scan complete | Nobitex markets=%d | CMC opportunities=%d | strategy=REAL_MOVEMENT_TREND | interval=%ss",
-                len(live_rows), len(candidates), self._real_scan_interval_ms() // 1000,
+                "%s Scan complete | Nobitex markets=%d | CMC opportunities=%d | strategy=REAL_MOVEMENT_TREND | interval=%ss",
+                tag, len(live_rows), len(candidates), self._real_scan_interval_ms() // 1000,
             )
-            paper_rows = list(live_rows)
-            self._paper_shadow_global_lead(paper_rows)
-            result = self.real_signal_tracker.process_new_signals(live_rows)
-            if result.get("opened") or result.get("closed") or result.get("pending"):
-                logger.info(
-                    "[REAL][NOBITEX] Execution result | opened=%s closed=%s pending=%s resized=%s",
-                    result.get("opened"), result.get("closed"), result.get("pending"),
-                    result.get("resized"),
-                )
+            if plan.get("open_paper"):
+                self._paper_shadow_global_lead(list(live_rows))
+            if self.real_signal_tracker is not None:
+                result = self.real_signal_tracker.process_new_signals(live_rows)
+                if result.get("opened") or result.get("closed") or result.get("pending"):
+                    logger.info(
+                        "[REAL][NOBITEX] Execution result | opened=%s closed=%s pending=%s resized=%s",
+                        result.get("opened"), result.get("closed"), result.get("pending"),
+                        result.get("resized"),
+                    )
         except Exception as exc:
-            logger.error("[REAL] Global-lead market scan failed: %s", exc, exc_info=True)
+            logger.error("%s Global-lead market scan failed: %s", tag, exc, exc_info=True)
 
     @staticmethod
     def _is_entry_signal(sig: Any) -> bool:
@@ -1190,30 +1269,10 @@ class CryptoScannerApp:
                 axis=1,
             ).tolist()
 
-            logger.debug("[PAPER] Public scanner refreshed (source=%s); live execution remains Nobitex-only.", self.api_source_var.get())
-
-            def track_signals_worker(signal_list):
-                try:
-                    if not self.signal_tracker.auto_trading_enabled:
-                        return
-                    res = self.signal_tracker.process_new_signals(signal_list)
-                    if isinstance(res, dict):
-                        opened = res.get("opened", 0)
-                        closed = res.get("closed", 0)
-                        if opened > 0 or closed > 0:
-                            logger.info(
-                                "[PAPER] Opened %d new trades, Closed %d trades.",
-                                opened, closed,
-                            )
-                except Exception as e:
-                    logger.error("❌ PAPER TRADING ERROR: %s", e)
-
-            threading.Thread(
-                target=track_signals_worker,
-                args=(self.latest_signals,),
-                daemon=True,
-                name="paper-trade-worker",
-            ).start()
+            logger.debug(
+                "[PAPER] Public scanner refreshed (source=%s); paper entries stay on the Nobitex cycle.",
+                self.api_source_var.get(),
+            )
         else:
             self.latest_signals = []
 
@@ -1443,6 +1502,21 @@ class CryptoScannerApp:
                 parent=self.root,
             )
             return
+        if normalize_execution_mode(getattr(self, "execution_mode", PAPER)) != LIVE:
+            messagebox.showwarning(
+                "Paper mode",
+                "Paper and live cannot run together.\n"
+                "Switch to Live, press Start on the Real tab, then SEND.",
+                parent=self.root,
+            )
+            return
+        if not bool(getattr(self, "real_auto_enabled", False)):
+            messagebox.showwarning(
+                "Live entries paused",
+                "Switch to Live and press Start on the Real tab before sending a Nobitex order.",
+                parent=self.root,
+            )
+            return
         live = self._lookup_nobitex_market(sym)
         if not live:
             messagebox.showwarning(
@@ -1555,7 +1629,7 @@ class CryptoScannerApp:
                 self.refresh()
 
     def ensure_real_auto_cycle(self) -> None:
-        if not self.ticker_running or self.real_signal_tracker is None:
+        if not getattr(self, "ticker_running", False) or self.trading_bot is None:
             return
         if self._real_auto_job:
             return
@@ -1564,19 +1638,28 @@ class CryptoScannerApp:
         except tk.TclError:
             self._real_auto_job = None
 
-    def set_real_auto_entries(self, enabled: bool) -> None:
+    def set_real_auto_entries(self, enabled: bool) -> bool:
+        if enabled and normalize_execution_mode(getattr(self, "execution_mode", PAPER)) != LIVE:
+            logger.warning("[REAL] Start ignored: switch to Live first (paper and live cannot run together).")
+            self.real_auto_enabled = False
+            if self.real_signal_tracker is not None:
+                self.real_signal_tracker.allow_new_entries = False
+            return False
         ready = self.real_signal_tracker is not None and self.trading_bot is not None
         self.real_auto_enabled = bool(enabled) and ready
         if self.real_signal_tracker is not None:
             self.real_signal_tracker.auto_trading_enabled = True
+            self.real_signal_tracker.allow_new_entries = bool(self.real_auto_enabled)
         if self.real_auto_enabled:
             self.ensure_real_auto_cycle()
             logger.info("[REAL] Auto entries ENABLED (real-movement trend cycle).")
         else:
             logger.info("[REAL] Auto entries PAUSED (open positions still monitored).")
+        self._notify_execution_mode()
+        return bool(self.real_auto_enabled) if enabled else True
 
     def _real_auto_cycle(self):
-        if not self.ticker_running or not self.real_signal_tracker:
+        if not self.ticker_running or not self.trading_bot:
             return
         try:
             if not self.root.winfo_exists():
@@ -1700,7 +1783,37 @@ class CryptoScannerApp:
         self.search_var.set("")
         self.apply_filter()
 
+    def _live_activity_blocking_db_clear(self) -> Optional[str]:
+        opens: List[Any] = []
+        if self.real_signal_tracker is not None:
+            try:
+                opens = self.real_signal_tracker.get_open_trades() or []
+            except Exception:
+                opens = []
+        exchange_orders: List[Any] = []
+        if self.trading_bot is not None:
+            try:
+                exchange_orders = self.trading_bot.get_open_orders() or []
+            except Exception as exc:
+                logger.warning("Could not list Nobitex open orders before DB clear: %s", exc)
+                return (
+                    "Could not confirm Nobitex open orders. "
+                    "Cancel any live orders on the exchange first, then retry."
+                )
+        if opens or exchange_orders:
+            return (
+                "Cannot clear databases while live activity exists: "
+                f"{len(opens)} tracked position(s), {len(exchange_orders)} exchange order(s). "
+                "Close or cancel them on Nobitex first."
+            )
+        return None
+
     def clear_databases(self) -> None:
+        blocked = self._live_activity_blocking_db_clear()
+        if blocked:
+            messagebox.showerror("Clear Database blocked", blocked, parent=self.root)
+            logger.error("clear_databases refused: %s", blocked)
+            return
         if not messagebox.askyesno(
             "🗑️ Clear Database — Step 1/2",
             "This will PERMANENTLY delete ALL trading data:\n\n"
