@@ -2,9 +2,9 @@
 
 Market intelligence is CoinMarketCap. Execution venue is Nobitex IRT.
 
-The engine never places orders. It keeps a coin when *observed prices*
-are still making a real upward move (CMC USD path we stored and/or CMC 1h),
-then applies a short quality filter on the Nobitex book.
+The engine never places orders. It keeps a coin when the *stored CMC USD
+path* is still making a real upward move, then applies a short quality
+filter on the Nobitex book. CMC 1h is confirmation and scoring only.
 
 This is not a lag/arbitrage model: Nobitex already running with the move
 is allowed. The point is to ride a forming trend, not to wait for a
@@ -357,15 +357,16 @@ class GlobalLeadEngine:
                 stats["btc_dump"] += 1
                 continue
 
-            cmc_trend = g["Global1hPct"] >= self.global_pump_pct
-            strong_observed = observed_global is not None and observed_global >= obs_need
-            if not (cmc_trend or strong_observed):
+            # CMC 1h is not an entry by itself. First-scan ghosts and a flat
+            # stored path with a leftover green 1h print filled paper books
+            # (BLUR/BANK/SENT at obs=0.00%). Require a measured USD path.
+            if observed_global is None or observed_global < obs_need:
                 stats["no_trend"] += 1
                 stats["no_lead"] += 1
                 self._reset_hit(symbol)
                 continue
 
-            live_move = observed_global if observed_global is not None else g["Global1hPct"]
+            live_move = observed_global
             if spread > self.max_spread_pct:
                 local_ok = observed_local is not None and observed_local >= 0.35
                 if not (local_ok and live_move >= max(obs_need + 0.5, 1.4)):

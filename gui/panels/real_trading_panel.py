@@ -140,11 +140,12 @@ class RealTradingPanel(tk.Frame):
             return
         try:
             self.tracker.pump_threshold_pct = (
-                0.0 if self._using_app_live_tracker
+                float(getattr(self.config, "min_observed_move_pct", 0.7) or 0.7)
+                if self._using_app_live_tracker
                 else float(getattr(self.config, "pump_threshold_pct", 5.0))
             )
             self.tracker.stop_loss_pct = float(getattr(self.config, "stop_loss_pct", 1.8))
-            self.tracker.trailing_distance_pct = float(getattr(self.config, "trailing_distance_pct", 1.6))
+            self.tracker.trailing_distance_pct = float(getattr(self.config, "trailing_distance_pct", 0.5))
             self.tracker.trailing_activation_pct = float(
                 getattr(self.config, "trailing_activation_pct", 0.8)
             )
@@ -1349,7 +1350,7 @@ class BotSettingsWindow(BaseDialog):
         ("Risk per trade %", "risk_per_trade_pct", 1.0),
         ("Max positions", "max_open_positions", 5),
         ("Stop Loss %", "stop_loss_pct", 1.8),
-        ("Trailing Distance %", "trailing_distance_pct", 1.6),
+        ("Trailing Distance %", "trailing_distance_pct", 0.5),
         ("Trail activation %", "trailing_activation_pct", 0.8),
         ("Max daily loss %", "max_drawdown_percent", 10.0),
     ]
@@ -1364,7 +1365,7 @@ class BotSettingsWindow(BaseDialog):
         "risk_per_trade_pct": 1.0,
         "max_open_positions": 3,
         "stop_loss_pct": 1.8,
-        "trailing_distance_pct": 1.6,
+        "trailing_distance_pct": 0.5,
         "trailing_activation_pct": 0.8,
         "max_drawdown_percent": 10.0,
         "pump_threshold_pct": 5.0,
@@ -1941,7 +1942,7 @@ class BotSettingsWindow(BaseDialog):
                 getattr(self.config, "stop_loss_pct", 1.8)
             )
             app.real_signal_tracker.trailing_distance_pct = float(
-                getattr(self.config, "trailing_distance_pct", 1.6)
+                getattr(self.config, "trailing_distance_pct", 0.5)
             )
             app.real_signal_tracker.trailing_activation_pct = float(
                 getattr(self.config, "trailing_activation_pct", 0.8)

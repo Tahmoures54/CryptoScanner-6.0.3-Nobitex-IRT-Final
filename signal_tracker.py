@@ -2,9 +2,9 @@
 SignalTracker v6.3.1 — Cycle-level phantom detection
 ====================================================
 Fixes vs v6.3.0 (from code review):
-- reconcile_open_positions runs every process_cycle, not only on __init__.
+- reconcile_open_positions runs every process_cycle that has open trades.
   Manual exchange sells are detected in the next cycle instead of waiting
-  for SL/TP.
+  for SL/TP. Empty books skip the wallet poll.
 - Protective exchange stops are cancelled on phantom / manual close.
 - Sells use min(db_qty, held_qty); partial fills resize the DB row.
 - Sell failures re-read fresh balance instead of trusting error text.
@@ -108,7 +108,7 @@ class SignalTracker:
         self.min_market_cap = float(min_market_cap)
 
         self.pump_threshold_pct = 5.0
-        self.trailing_distance_pct = 1.6
+        self.trailing_distance_pct = 0.5
         self.trailing_activation_pct = 0.8
         self.stop_loss_pct = 1.8
         self.trailing_stop_enabled = True
@@ -283,6 +283,22 @@ class SignalTracker:
             return False
         return (not SignalTracker._is_phantom_qty(held, size)) and held < size * _PARTIAL_SYNC_RATIO
 
+    def has_managed_positions(self) -> bool:
+        """True when the DB still has an open trade or a pending entry."""
+        with self._lock:
+            try:
+                with self._get_conn() as conn:
+                    cur = conn.cursor()
+                    cur.execute("SELECT 1 FROM trades WHERE status='open' LIMIT 1")
+                    if cur.fetchone():
+                        return True
+                    cur.execute(
+                        "SELECT 1 FROM pending_signals WHERE status='pending' LIMIT 1"
+                    )
+                    return cur.fetchone() is not None
+            except sqlite3.Error:
+                return False
+
     # ══════════════════════════════════════════════════════════════
     # RECONCILE — every cycle, I/O outside the DB lock
     # ══════════════════════════════════════════════════════════════
@@ -291,7 +307,6 @@ class SignalTracker:
         if self.mode != "real" or not self.executor:
             return result
 
-        logger.info("Reconciling open positions with exchange balances...")
         with self._lock:
             try:
                 with self._get_conn() as conn:
@@ -299,6 +314,11 @@ class SignalTracker:
             except sqlite3.Error as e:
                 logger.error("Reconcile DB error: %s", e)
                 return result
+        if not rows:
+            logger.debug("Reconcile skipped: no open positions")
+            return result
+
+        logger.info("Reconciling open positions with exchange balances...")
 
         phantoms: List[Tuple[Dict[str, Any], float]] = []
         resizes: List[Tuple[Dict[str, Any], float]] = []
@@ -568,7 +588,7 @@ class SignalTracker:
         if self.pump_threshold_pct <= 0:
             self.pump_threshold_pct = 5.0
         if self.trailing_distance_pct <= 0:
-            self.trailing_distance_pct = 1.6
+            self.trailing_distance_pct = 0.5
         if getattr(self, "trailing_activation_pct", 0) < 0:
             self.trailing_activation_pct = 0.0
         if self.stop_loss_pct <= 0:
@@ -1026,10 +1046,14 @@ class SignalTracker:
         if trailing_enabled and profit_pct > 0 and profit_pct >= trail_activation:
             if sign == 1.0:
                 trail_level = extreme * (1.0 - trail_dist / 100.0)
+                # Never lock a loss. act=0.80 + dist=1.60 placed the stop
+                # ~0.81% below entry and closed BANK as Trailing Stop −0.80%.
+                trail_level = max(trail_level, entry)
                 if trail_level > stop_level:
                     stop_level = trail_level
             else:
                 trail_level = extreme * (1.0 + trail_dist / 100.0)
+                trail_level = min(trail_level, entry)
                 if trail_level < stop_level:
                     stop_level = trail_level
 
@@ -1280,9 +1304,10 @@ class SignalTracker:
         )
         self.peak_equity = max(self.peak_equity, self.account_balance)
         logger.info(
-            "TRADE CLOSED: %s %s | Net PnL: %.2f%% ($%.2f) | Reason: %s",
+            "TRADE CLOSED: %s %s | %s | Reason: %s",
             str(rec["side"]).upper(), rec["symbol"],
-            ev["pnl_pct"], pnl_amount, ev["exit_reason"],
+            self._format_closed_pnl(ev["pnl_pct"], pnl_amount),
+            ev["exit_reason"],
         )
         cooldown = (
             self.cooldown_after_loss_min if ev["pnl_pct"] <= 0 else self.cooldown_after_win_min
@@ -1684,10 +1709,23 @@ class SignalTracker:
         )
         return True
 
+    def _format_closed_pnl(self, pnl_pct: float, pnl_amount: float) -> str:
+        quote = str(getattr(self, "quote_currency", "") or "").upper()
+        if quote in ("IRT", "RLS", "IRR"):
+            return "Net PnL: %.2f%% (%.2f IRT)" % (pnl_pct, pnl_amount)
+        if quote and quote not in ("USDT", "USD"):
+            return "Net PnL: %.2f%% (%.2f %s)" % (pnl_pct, pnl_amount, quote)
+        return "Net PnL: %.2f%% ($%.2f)" % (pnl_pct, pnl_amount)
+
     def _extract_pump_percentage(self, row: Dict[str, Any], signal: str) -> Optional[float]:
+        observed = safe_float(row.get("ObservedGlobalMove (%)"))
+        if observed is not None:
+            return observed
+        live = safe_float(row.get("LiveLeadMove (%)"))
+        if live is not None:
+            return live
         for key in (
             "pump_percentage", "Pump Percentage", "pump_pct", "Pump_Pct",
-            "LiveLeadMove (%)", "ObservedGlobalMove (%)", "Global1hPct",
             "Change", "1h Change (%)", "change_1h", "percent_change_1h",
             "price_change_percentage_1h", "price_change_pct",
         ):
@@ -1774,7 +1812,10 @@ class SignalTracker:
                 or safe_float(row.get("1h Change (%)"))
                 or 0.0
             )
-        if ("movement" in signal_l or "pump" in signal_l) and pump_pct < self.pump_threshold_pct:
+        if (
+            any(token in signal_l for token in ("movement", "pump", "lead", "trend"))
+            and pump_pct < self.pump_threshold_pct
+        ):
             self._log_skip(
                 "%s skipped: movement %.2f%% < threshold %.2f%%",
                 symbol, pump_pct, self.pump_threshold_pct,
@@ -1906,8 +1947,9 @@ class SignalTracker:
 
         price_lookup, _signal_lookup = self._build_lookups(market_data)
         base_risk = self._get_risk_settings()
+        managed = self.has_managed_positions() if (self.mode == "real" and self.executor) else False
 
-        if self.mode == "real" and self.executor:
+        if self.mode == "real" and self.executor and managed:
             rec = self.reconcile_open_positions()
             stats["closed"] += rec.get("closed_phantom", 0)
             stats["resized"] += rec.get("resized", 0)

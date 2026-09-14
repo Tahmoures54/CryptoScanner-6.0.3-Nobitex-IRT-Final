@@ -1,4 +1,10 @@
-from trading.execution_mode import LIVE, PAPER, cycle_plan, normalize_execution_mode
+from trading.execution_mode import (
+    LIVE,
+    PAPER,
+    cycle_plan,
+    normalize_execution_mode,
+    should_run_live_tracker,
+)
 
 
 def test_normalize_defaults_to_paper():
@@ -43,3 +49,23 @@ def test_paper_and_live_entries_are_mutually_exclusive():
     assert paper["open_live"] != live["open_live"]
     assert not (paper["open_paper"] and paper["open_live"])
     assert not (live["open_paper"] and live["open_live"])
+
+
+def test_paper_scan_skips_live_tracker_without_leftover_positions():
+    plan = cycle_plan(PAPER, live_entries_enabled=True)
+    assert plan["monitor_live"] is True
+    assert should_run_live_tracker(plan, False) is False
+    assert should_run_live_tracker(plan, True) is True
+
+
+def test_live_start_always_runs_live_tracker():
+    plan = cycle_plan(LIVE, live_entries_enabled=True)
+    assert should_run_live_tracker(plan, False) is True
+    assert should_run_live_tracker(plan, True) is True
+
+
+def test_live_paused_only_monitors_leftover_positions():
+    plan = cycle_plan(LIVE, live_entries_enabled=False)
+    assert plan["open_live"] is False
+    assert should_run_live_tracker(plan, False) is False
+    assert should_run_live_tracker(plan, True) is True

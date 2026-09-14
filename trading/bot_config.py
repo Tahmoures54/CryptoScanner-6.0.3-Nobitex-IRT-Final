@@ -29,7 +29,7 @@ DEFAULT_MAX_NOTIONAL_QUOTE = 10_000_000.0
 DEFAULT_MIN_NOTIONAL_QUOTE = 300_000.0
 DEFAULT_MAX_POSITION_PCT = 30.0
 DEFAULT_MAX_TOTAL_EXPOSURE_PCT = 80.0
-STRATEGY_DEFAULTS_VERSION = 4
+STRATEGY_DEFAULTS_VERSION = 5
 # Runtime configuration lives in the per-user AppData directory. The project
 # copy under data/ is a release template only and is never the live config.
 DEFAULT_CONFIG_FILE = os.path.join(APPDATA_DIR, "bot_config.json")
@@ -116,7 +116,7 @@ class BotConfig:
     pump_threshold_pct: float = 3.0
     movement_lookback_scans: int = 4
     stop_loss_pct: float = 1.8
-    trailing_distance_pct: float = 1.6
+    trailing_distance_pct: float = 0.5
     trailing_activation_pct: float = 0.8
     trailing_stop_enabled: bool = True
     take_profit_percent: float = 0.0
@@ -373,6 +373,14 @@ EARLY_TREND_DEFAULTS: Dict[str, Any] = {
     "check_interval_seconds": 15,
 }
 
+# Trail distance 1.6% with a 0.8% activation sat below entry and closed
+# paper winners as Trailing Stop losses (BANK −0.80%). Keep activation
+# at 0.8% and trail 0.5% behind the peak so small winners actually lock.
+WINNER_LOCK_DEFAULTS: Dict[str, Any] = {
+    "strategy_defaults_version": STRATEGY_DEFAULTS_VERSION,
+    "trailing_distance_pct": 0.5,
+}
+
 
 def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
     path = _resolve_config_path(file_path)
@@ -405,6 +413,8 @@ def load_config(file_path: str = DEFAULT_CONFIG_FILE) -> BotConfig:
                 data.update(POSITION_SIZE_DEFAULTS)
             if version < 4:
                 data.update(EARLY_TREND_DEFAULTS)
+            if version < 5:
+                data.update(WINNER_LOCK_DEFAULTS)
 
             cfg = BotConfig.from_dict(data)
             cfg.execution_mode = normalize_execution_mode(getattr(cfg, "execution_mode", PAPER))

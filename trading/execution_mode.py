@@ -37,3 +37,17 @@ def cycle_plan(mode: Any, live_entries_enabled: bool = False) -> Dict[str, bool]
         "monitor_live": True,
         "scan_tag": "[PAPER]" if paper else "[REAL]",
     }
+
+
+def should_run_live_tracker(plan: Dict[str, Any], has_live_positions: bool) -> bool:
+    """Call the live SignalTracker (and therefore Nobitex wallets) only when needed.
+
+    Paper scans must not poll wallets. Leftover live positions are still
+    managed after switching back to paper. Live Start still processes every
+    scan so new entries can open.
+    """
+    if not isinstance(plan, dict):
+        return bool(has_live_positions)
+    if plan.get("open_live"):
+        return True
+    return bool(has_live_positions)

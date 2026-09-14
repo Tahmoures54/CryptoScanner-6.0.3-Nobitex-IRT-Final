@@ -26,10 +26,11 @@ Observed Global Move % =
     (CMC USD now − CMC USD N scans ago) / CMC USD N scans ago × 100
 ```
 
-A coin qualifies when **either**:
+A coin qualifies when the stored CMC USD path over the lookback is still
+up by the observed threshold (**not** from a green CMC 1h print alone).
 
-- CMC 1h >= threshold, or
-- stored CMC USD path over the lookback is still up by the observed threshold
+CMC 1h is used for scoring and as extra confirmation after a real path
+exists. First scans have no stored path yet, so they do not open.
 
 **and** all of:
 
@@ -51,8 +52,8 @@ waiting for a full window.
 
 Default production gates:
 
-- CMC 1h move >= 1.2% **or** observed CMC move >= 0.7%
-- Trend confirm 1 scan; strong 1h / observed moves enter on the first qualifying scan
+- Observed CMC USD path >= 0.7% (CMC 1h is confirmation/scoring only)
+- Trend confirm 1 scan; strong observed moves (>= 1.2%) or CMC 1h >= 1.5% skip extra confirm
 - Lookback 4 scans (~1 min at a 15s interval); partial history after 3 prints is enough
 - Stored CMC path not falling / not fading (fade threshold −0.25%)
 - Nobitex spread <= 1.2%; up to +0.35% extra only if local is participating and the live move is strong
@@ -62,7 +63,7 @@ Default production gates:
 - Local 24h already-pumped cap 10%
 - Skip alts when BTC dumps more than 1.0%
 - Maximum chase (ask vs last) <= 0.55%
-- Stop 1.8%; trail activates at 0.8% profit with 1.6% distance; no take-profit cap
+- Stop 1.8%; trail activates at 0.8% profit with 0.5% distance and never sits below entry; no take-profit cap
 - Fixed size: 10,000,000 IRT (Rial) per trade
 
 These are risk/quality filters, not profit guarantees.

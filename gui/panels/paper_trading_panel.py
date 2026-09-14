@@ -60,7 +60,7 @@ class PaperTradingPanel(tk.Frame):
         "max_open": "3",
         "capital": "38000000",
         "trailing_enabled": True,
-        "trailing_distance": "1.6",
+        "trailing_distance": "0.5",
         "trailing_activation": "0.8",
     }
 
@@ -122,12 +122,13 @@ class PaperTradingPanel(tk.Frame):
         try:
             cfg = getattr(self.main_app, "_bot_cfg", None)
             if cfg is not None:
-                self.tracker.pump_threshold_pct = 0.0
+                obs_need = float(getattr(cfg, "min_observed_move_pct", 0.7) or 0.7)
+                self.tracker.pump_threshold_pct = obs_need
                 self.tracker.ignore_signal_filters = True
                 self.tracker.confirmation_enabled = False
                 self.tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 1.8) or 1.8)
                 self.tracker.trailing_distance_pct = float(
-                    getattr(cfg, "trailing_distance_pct", 1.6) or 1.6
+                    getattr(cfg, "trailing_distance_pct", 0.5) or 0.5
                 )
                 self.tracker.trailing_activation_pct = float(
                     getattr(cfg, "trailing_activation_pct", 0.8) or 0.8
@@ -149,10 +150,12 @@ class PaperTradingPanel(tk.Frame):
             sl = float(settings.get("sl", 1.8))
             max_open = int(settings.get("max_open", 3))
             capital = float(settings.get("capital", 10_000_000))
-            trailing_distance = float(settings.get("trailing_distance", 1.6))
+            trailing_distance = float(settings.get("trailing_distance", 0.5))
             trailing_enabled = bool(settings.get("trailing_enabled", True))
 
-            self.tracker.pump_threshold_pct = 0.0
+            self.tracker.pump_threshold_pct = float(
+                getattr(getattr(self.main_app, "_bot_cfg", None), "min_observed_move_pct", 0.7) or 0.7
+            )
             self.tracker.trailing_distance_pct = trailing_distance
             self.tracker.trailing_activation_pct = float(
                 settings.get("trailing_activation", 0.8)

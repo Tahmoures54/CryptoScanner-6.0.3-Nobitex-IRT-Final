@@ -127,11 +127,49 @@ class TestSignalTrackerCoreLogic(unittest.TestCase):
         self.assertFalse(res["should_close"])
         self.assertAlmostEqual(res["new_sl"], 95.88, places=2)
 
-        res2 = SignalTracker._evaluate_open_trade(
+        res_hit = SignalTracker._evaluate_open_trade(
             "short", 100.0, 96.0, 95.88, "", risk, 100.0
         )
-        self.assertTrue(res2["should_close"])
-        self.assertEqual(res2["exit_reason"], "Trailing Stop")
+        self.assertTrue(res_hit["should_close"])
+        self.assertEqual(res_hit["exit_reason"], "Trailing Stop")
+
+    def test_long_trail_does_not_lock_below_entry(self):
+        risk = self.risk.copy()
+        risk["stop_loss_pct"] = 1.8
+        risk["trailing_activation_pct"] = 0.80
+        risk["trailing_distance_pct"] = 1.60
+        risk["reverse_signal_exit_enabled"] = False
+        res = SignalTracker._evaluate_open_trade(
+            "long", 100.0, 100.81, None, "", risk, 100.0
+        )
+        self.assertFalse(res["should_close"])
+        self.assertGreaterEqual(res["new_sl"], 100.0)
+
+        res_hit = SignalTracker._evaluate_open_trade(
+            "long", 100.0, 99.90, res["new_sl"], "", risk, 100.0
+        )
+        self.assertTrue(res_hit["should_close"])
+        self.assertEqual(res_hit["exit_reason"], "Trailing Stop")
+        self.assertGreaterEqual(res_hit["pnl_pct"], -0.05)
+
+    def test_extract_pump_prefers_observed_even_if_flat(self):
+        row = {
+            "ObservedGlobalMove (%)": 0.0,
+            "LiveLeadMove (%)": 1.36,
+            "Global1hPct": 1.36,
+            "1h Change (%)": 1.36,
+        }
+        pump = SignalTracker._extract_pump_percentage(
+            object(), row, "Trend Buy +1.36%"
+        )
+        self.assertEqual(pump, 0.0)
+
+    def test_closed_pnl_uses_irt_not_dollar(self):
+        tracker = SignalTracker.__new__(SignalTracker)
+        tracker.quote_currency = "IRT"
+        text = SignalTracker._format_closed_pnl(tracker, -0.80, -70393.26)
+        self.assertIn("IRT", text)
+        self.assertNotIn("$", text)
 
     def test_reverse_signal_disabled(self):
         risk = self.risk.copy()
@@ -203,6 +241,26 @@ class TestSignalTrackerIntegration(unittest.TestCase):
             "RSI": 45.0,
             "24h Change (%)": 2.0,
         }
+
+    def test_empty_tracker_has_no_managed_positions(self):
+        self.assertFalse(self.tracker.has_managed_positions())
+        self.tracker.process_new_signals([self._make_row("BTC", 100, "Buy Signal")])
+        self.assertTrue(self.tracker.has_managed_positions())
+
+    def test_trend_entry_respects_observed_threshold(self):
+        self.tracker.pump_threshold_pct = 0.7
+        row = self._make_row("W", 23680, "Trend Buy +0.17%")
+        row["ObservedGlobalMove (%)"] = 0.17
+        row["Global1hPct"] = 1.32
+        stats = self.tracker.process_new_signals([row])
+        self.assertEqual(stats["opened"], 0)
+
+    def test_generic_buy_signal_is_not_gated_by_trend_threshold(self):
+        self.tracker.pump_threshold_pct = 5.0
+        stats = self.tracker.process_new_signals(
+            [self._make_row("BTC", 100, "Buy Signal")]
+        )
+        self.assertEqual(stats["opened"], 1)
 
     def test_open_and_close_long(self):
         data = [self._make_row("BTC", 100, "Buy Signal", score=25)]

@@ -70,7 +70,9 @@ from trading.bot_config import (
     load_config,
     save_config,
 )
-from trading.execution_mode import LIVE, PAPER, cycle_plan, normalize_execution_mode
+from trading.execution_mode import (
+    LIVE, PAPER, cycle_plan, normalize_execution_mode, should_run_live_tracker,
+)
 from trading.global_lead_engine import GlobalLeadEngine
 
 from binance_data_provider import build_binance_dataframe
@@ -231,9 +233,10 @@ class CryptoScannerApp:
                     or getattr(cfg, "quote_currency", "IRT")
                     or "IRT"
                 ).upper()
-                self.real_signal_tracker.pump_threshold_pct = 0.0
+                obs_need = float(getattr(cfg, "min_observed_move_pct", 0.7) or 0.7)
+                self.real_signal_tracker.pump_threshold_pct = obs_need
                 self.real_signal_tracker.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 1.8))
-                self.real_signal_tracker.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 1.6))
+                self.real_signal_tracker.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 0.5))
                 self.real_signal_tracker.trailing_activation_pct = float(
                     getattr(cfg, "trailing_activation_pct", 0.8)
                 )
@@ -251,7 +254,6 @@ class CryptoScannerApp:
                 self.real_signal_tracker.entry_cooldown_seconds = int(getattr(cfg, "entry_cooldown_seconds", 480))
                 self.real_signal_tracker.trailing_stop_enabled = bool(getattr(cfg, "trailing_stop_enabled", True))
                 self.real_signal_tracker.take_profit_percent = float(getattr(cfg, "take_profit_percent", 0.0))
-                self.real_signal_tracker._sync_balance_from_executor()
                 logger.info(
                     "[REAL] Nobitex tracker ready | size=%.0f IRT | mode=%s | entries=off until Live+Start",
                     self.real_signal_tracker.fixed_position_quote,
@@ -387,7 +389,7 @@ class CryptoScannerApp:
         st.mode = "paper"
         st.ignore_signal_filters = True
         st.confirmation_enabled = False
-        st.pump_threshold_pct = 0.0
+        st.pump_threshold_pct = float(getattr(cfg, "min_observed_move_pct", 0.7) or 0.7) if cfg is not None else 0.7
         st.min_volume_24h = 0.0
         st.min_market_cap = 0.0
         st.account_balance = cash
@@ -398,7 +400,7 @@ class CryptoScannerApp:
                 getattr(cfg, "max_open_positions", getattr(cfg, "max_open_trades", 3)) or 3
             )
             st.stop_loss_pct = float(getattr(cfg, "stop_loss_pct", 1.8) or 1.8)
-            st.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 1.6) or 1.6)
+            st.trailing_distance_pct = float(getattr(cfg, "trailing_distance_pct", 0.5) or 0.5)
             st.trailing_activation_pct = float(getattr(cfg, "trailing_activation_pct", 0.8) or 0.8)
             st.trailing_stop_enabled = bool(getattr(cfg, "trailing_stop_enabled", True))
             st.take_profit_percent = float(getattr(cfg, "take_profit_percent", 0.0) or 0.0)
@@ -422,7 +424,9 @@ class CryptoScannerApp:
             return
         st.ignore_signal_filters = True
         st.confirmation_enabled = False
-        st.pump_threshold_pct = 0.0
+        st.pump_threshold_pct = float(
+            getattr(self.global_lead_engine, "min_observed_move_pct", 0.7) or 0.7
+        )
         try:
             result = st.process_new_signals(rows)
             if result.get("opened") or result.get("pending") or result.get("closed"):
@@ -701,8 +705,13 @@ class CryptoScannerApp:
             )
             if plan.get("open_paper"):
                 self._paper_shadow_global_lead(list(live_rows))
-            if self.real_signal_tracker is not None:
-                result = self.real_signal_tracker.process_new_signals(live_rows)
+            live_tracker = self.real_signal_tracker
+            run_live = live_tracker is not None and should_run_live_tracker(
+                plan,
+                live_tracker.has_managed_positions(),
+            )
+            if run_live:
+                result = live_tracker.process_new_signals(live_rows)
                 if result.get("opened") or result.get("closed") or result.get("pending"):
                     logger.info(
                         "[REAL][NOBITEX] Execution result | opened=%s closed=%s pending=%s resized=%s",
@@ -734,11 +743,12 @@ class CryptoScannerApp:
             row["Price"] = ask
             row["price"] = ask
         global_1h = safe_float(hit.get("Global1hPct")) or 0.0
-        observed = safe_float(hit.get("ObservedGlobalMove (%)") or hit.get("LiveLeadMove (%)"))
-        live_move = observed if observed else global_1h
-        if live_move:
-            row["1h Change (%)"] = live_move
-            row["pump_pct"] = live_move
+        observed = safe_float(hit.get("ObservedGlobalMove (%)"))
+        live_move = safe_float(hit.get("LiveLeadMove (%)"))
+        pump = observed if observed is not None else (live_move if live_move is not None else global_1h)
+        if pump is not None:
+            row["1h Change (%)"] = pump
+            row["pump_pct"] = pump
         if global_1h:
             row["Global1hPct"] = global_1h
         volume = safe_float(hit.get("GlobalVolumeUSD") or hit.get("Volume"))

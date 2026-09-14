@@ -30,13 +30,13 @@ CoinMarketCap's current API provides latest price, volume, market cap and percen
 
 The strategy does not generate synthetic/random market prices.
 
-At each scan CryptoScanner stores the actual CMC USD price observed for an asset **and** the live Nobitex ask. Entry is based on that stored path (lookback scans), not on a synthetic price generator. CMC's rolling 1h field is only a confirmation; a falling observed path blocks the trade.
+At each scan CryptoScanner stores the actual CMC USD price observed for an asset **and** the live Nobitex ask. Entry requires that stored USD path to still be up; CMC's rolling 1h field is only confirmation and scoring. A missing or flat observed path, or a falling observed path, blocks the trade.
 
 Recommended initial settings for a live or paper account:
 
-- CMC 1h move: 1.2% (or observed lookback move 0.7%)
+- Observed lookback move: 0.7% (CMC 1h 1.2% is confirmation, not a standalone entry)
 - Lookback: 4 scans (partial history after 3 prints is enough)
-- Trend confirm scans: 1 (strong 1h / observed moves skip extra confirm)
+- Trend confirm scans: 1 (strong observed / 1h moves skip extra confirm)
 - Scan interval: 15 seconds
 - Max Nobitex spread: 1.2% (slightly wider only if local is participating)
 - Min CMC 24h volume: $1,000,000
@@ -44,9 +44,10 @@ Recommended initial settings for a live or paper account:
 - Fixed size: 10,000,000 IRT (Rial) = 1,000,000 Tomans per trade
 - Stop Loss: 1.8%
 - Trailing activation: 0.8%
-- Trailing distance: 1.6% (lock small winners; no take-profit cap)
+- Trailing distance: 0.5% (lock small winners; trail never sits below entry)
 - Extra entry-tick confirmation: **OFF**
 - Paper uses the same rules and the full Nobitex book for exits
+- Paper and live never open together; paper scans do not poll Nobitex wallets
 - Auto Trading: **OFF until connection diagnostics pass**
 - IRT amounts are Rial (same as the Nobitex wallet)
 
